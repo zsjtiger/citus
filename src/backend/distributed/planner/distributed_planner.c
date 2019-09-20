@@ -8,10 +8,12 @@
  */
 
 #include "postgres.h"
+#include "funcapi.h"
 
 #include <float.h>
 #include <limits.h>
 
+#include "access/htup_details.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_type.h"
 #include "distributed/citus_nodefuncs.h"
@@ -1098,6 +1100,51 @@ FinalizeRouterPlan(PlannedStmt *localPlan, CustomScan *customScan)
 
 		/* build target entry pointing to remote scan range table entry */
 		newVar = makeVarFromTargetEntry(customScanRangeTableIndex, targetEntry);
+
+		if (newVar->vartype == RECORDOID)
+		{
+			/*
+			 * We cannot normally parse record types coming from the workers
+			 * unless we "bless" the tuple descriptor, which adds a transient
+			 * type to the type cache and assigns it a type mod value, which
+			 * is the key in the type cache. By assigning it to the vartypmod
+			 * this information eventually makes its way into the TupleDesc
+			 * used by the executor, which allows BuildTupleFromCStrings to
+			 * parse the strings coming from the worker nodes into records.
+			 */
+			if (IsA(targetEntry->expr, FuncExpr))
+			{
+				/*
+				 * Handle functions that return records on the target
+				 * list, e.g. SELECT function_call(1,2);
+				 */
+				FuncExpr *funcExpr = (FuncExpr *) targetEntry->expr;
+				Oid resultTypeId = InvalidOid;
+				TupleDesc resultTupleDesc = NULL;
+				TypeFuncClass typeClass;
+
+				/* get_func_result_type blesses the tuple descriptor */
+				typeClass = get_func_result_type(funcExpr->funcid, &resultTypeId,
+												 &resultTupleDesc);
+				if (typeClass == TYPEFUNC_COMPOSITE)
+				{
+					newVar->vartypmod = resultTupleDesc->tdtypmod;
+				}
+			}
+			else if (IsA(targetEntry->expr, RowExpr))
+			{
+				/*
+				 * Handle row expressions, e.g. SELECT (1,2);
+				 */
+				RowExpr *rowExpr = (RowExpr *) targetEntry->expr;
+				TupleDesc resultTupleDesc = ExecTypeFromExprList(rowExpr->args);
+
+				BlessTupleDesc(resultTupleDesc);
+
+				newVar->vartypmod = resultTupleDesc->tdtypmod;
+			}
+		}
+
 		newTargetEntry = flatCopyTargetEntry(targetEntry);
 		newTargetEntry->expr = (Expr *) newVar;
 		targetList = lappend(targetList, newTargetEntry);
