@@ -1,0 +1,326 @@
+CREATE SCHEMA fkey_reference_local_table;
+SET search_path TO 'fkey_reference_local_table';
+--- ALTER TABLE commands defining foreign key constraint between local tables and reference tables ---
+-- create test tables
+CREATE TABLE local_table(l1 int);
+CREATE TABLE reference_table(r1 int primary key);
+SELECT create_reference_table('reference_table');
+ create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+-- foreign key from local table to reference table --
+-- this should fail as reference table does not have a placement in coordinator
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1);
+ERROR:  relation local_table is not distributed
+CONTEXT:  SQL statement "SELECT fk."l1" FROM ONLY "fkey_reference_local_table"."local_table" fk LEFT OUTER JOIN ONLY "fkey_reference_local_table"."reference_table" pk ON ( pk."r1" OPERATOR(pg_catalog.=) fk."l1") WHERE pk."r1" IS NULL AND (fk."l1" IS NOT NULL)"
+-- replicate reference table to coordinator
+SELECT master_add_node('localhost', :master_port, groupId => 0);
+NOTICE:  Replicating reference table "orders_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "customer" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "nation" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "part" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "supplier" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_right_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_third_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "reference_table" to the node localhost:xxxxx
+ master_add_node
+---------------------------------------------------------------------
+               4
+(1 row)
+
+-- we do support ALTER TABLE ADD CONSTRAINT foreign key from a local table to a
+-- reference table within the transaction block
+BEGIN;
+  ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1);
+ERROR:  cannot join local tables and reference tables in a transaction block, udf block, or distributed CTE subquery
+CONTEXT:  SQL statement "SELECT fk."l1" FROM ONLY "fkey_reference_local_table"."local_table" fk LEFT OUTER JOIN ONLY "fkey_reference_local_table"."reference_table" pk ON ( pk."r1" OPERATOR(pg_catalog.=) fk."l1") WHERE pk."r1" IS NULL AND (fk."l1" IS NOT NULL)"
+ROLLBACK;
+-- we support ON DELETE CASCADE behaviour in "ALTER TABLE ADD foreign_key local_table
+-- (to reference_table) commands
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1) ON DELETE CASCADE;
+-- show that ON DELETE CASCADE works
+INSERT INTO reference_table VALUES (11);
+INSERT INTO local_table VALUES (11);
+DELETE FROM reference_table WHERE r1=11;
+SELECT count(*) FROM local_table;
+ count
+---------------------------------------------------------------------
+     1
+(1 row)
+
+-- show that we support DROP foreign key constraint
+ALTER TABLE local_table DROP CONSTRAINT fkey_local_to_ref;
+-- we support ON UPDATE CASCADE behaviour in "ALTER TABLE ADD foreign_key local_table
+-- (to reference table)" commands
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1) ON UPDATE CASCADE;
+ERROR:  insert or update on table "local_table" violates foreign key constraint "fkey_local_to_ref"
+DETAIL:  Key (l1)=(11) is not present in table "reference_table".
+-- show that ON UPDATE CASCADE works
+INSERT INTO reference_table VALUES (12);
+INSERT INTO local_table VALUES (12);
+UPDATE reference_table SET r1=13 WHERE r1=12;
+SELECT * FROM local_table ORDER BY l1;
+ l1
+---------------------------------------------------------------------
+ 11
+ 12
+(2 rows)
+
+-- DROP foreign_key constraint for next commands
+ALTER TABLE local_table DROP CONSTRAINT fkey_local_to_ref;
+ERROR:  constraint "fkey_local_to_ref" of relation "local_table" does not exist
+-- show that we are checking for foreign key constraint while defining
+INSERT INTO local_table VALUES (2);
+-- this should fail
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1);
+ERROR:  insert or update on table "local_table" violates foreign key constraint "fkey_local_to_ref"
+DETAIL:  Key (l1)=(11) is not present in table "reference_table".
+INSERT INTO reference_table VALUES (2);
+-- this should work
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1);
+ERROR:  insert or update on table "local_table" violates foreign key constraint "fkey_local_to_ref"
+DETAIL:  Key (l1)=(11) is not present in table "reference_table".
+-- show that we are checking for foreign key constraint after defining
+-- this should fail
+INSERT INTO local_table VALUES (1);
+INSERT INTO reference_table VALUES (1);
+-- this should work
+INSERT INTO local_table VALUES (1);
+-- we do support ALTER TABLE DROP CONSTRAINT foreign key from a local table to a
+-- reference table within the transaction block
+BEGIN;
+  ALTER TABLE local_table DROP CONSTRAINT fkey_local_to_ref;
+ERROR:  constraint "fkey_local_to_ref" of relation "local_table" does not exist
+ROLLBACK;
+-- show that we do not allow removing coordinator when we have a foreign_key constraint
+-- between a coordinator local table and a reference table
+SELECT master_remove_node('localhost', :master_port);
+ master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+-- show that DROP table without should error out without cascade
+DROP TABLE reference_table;
+-- DROP them at once
+DROP TABLE reference_table CASCADE;
+ERROR:  table "reference_table" does not exist
+-- create one reference table and one distributed table for next tests
+CREATE TABLE reference_table(r1 int primary key);
+SELECT create_reference_table('reference_table');
+ create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+CREATE TABLE distributed_table(d1 int primary key);
+SELECT create_distributed_table('distributed_table', 'd1');
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+-- chain the tables's foreign key constraints to each other (local -> reference -> distributed)
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES reference_table(r1);
+ERROR:  relation local_table is not distributed
+CONTEXT:  SQL statement "SELECT fk."l1" FROM ONLY "fkey_reference_local_table"."local_table" fk LEFT OUTER JOIN ONLY "fkey_reference_local_table"."reference_table" pk ON ( pk."r1" OPERATOR(pg_catalog.=) fk."l1") WHERE pk."r1" IS NULL AND (fk."l1" IS NOT NULL)"
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_dist FOREIGN KEY(r1) REFERENCES distributed_table(d1);
+ERROR:  cannot create foreign key constraint since foreign keys from reference tables to distributed tables are not supported
+DETAIL:  A reference table can only have reference keys to other reference tables
+INSERT INTO distributed_table VALUES (41);
+INSERT INTO reference_table VALUES (41);
+-- this should work
+INSERT INTO local_table VALUES (41);
+-- below should fail
+DROP TABLE reference_table;
+-- below test if we handle the foreign key dependencies properly when issueing DROP command
+-- (witohut deadlocks and with no weird errors etc.)
+DROP TABLE local_table, reference_table, distributed_table;
+ERROR:  table "reference_table" does not exist
+-- create test tables
+CREATE TABLE local_table(l1 int primary key);
+ERROR:  relation "local_table" already exists
+CREATE TABLE reference_table(r1 int);
+SELECT create_reference_table('reference_table');
+ create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+-- remove master node from pg_dist_node
+SELECT master_remove_node('localhost', :master_port);
+ERROR:  node at "localhost:xxxxx" does not exist
+-- foreign key from reference table to local table --
+-- this should fail
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+-- we do support ALTER TABLE ADD CONSTRAINT foreign_key from a reference table
+-- to a local table within the transaction block
+BEGIN;
+  ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+ROLLBACK;
+-- replicate reference table to coordinator
+SELECT master_add_node('localhost', :master_port, groupId => 0);
+NOTICE:  Replicating reference table "orders_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "customer" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "nation" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "part" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "supplier" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_right_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_third_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "reference_table" to the node localhost:xxxxx
+ master_add_node
+---------------------------------------------------------------------
+               5
+(1 row)
+
+-- show that we are checking for foreign key constraint while defining
+INSERT INTO reference_table VALUES (3);
+-- this should fail
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+INSERT INTO local_table VALUES (3);
+-- we do not support ON DELETE/UPDATE CASCADE behaviour in "ALTER TABLE ADD foreign_key reference_table (to local_table)" commands
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1) ON DELETE CASCADE;
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1) ON UPDATE CASCADE;
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+-- this should work
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+-- show that we are checking for foreign key constraint after defining
+-- this should fail
+INSERT INTO reference_table VALUES (4);
+INSERT INTO local_table VALUES (4);
+-- this should work
+INSERT INTO reference_table VALUES (4);
+-- we do support ALTER TABLE DROP CONSTRAINT foreign_key from a reference table
+-- to a local table within a transaction block
+BEGIN;
+  ALTER TABLE reference_table DROP CONSTRAINT fkey_ref_to_local;
+ERROR:  constraint "fkey_ref_to_local" of relation "reference_table" does not exist
+COMMIt;
+-- show that we do not allow removing coordinator when we have a foreign key constraint
+-- between a coordinator local table and a reference table
+SELECT master_remove_node('localhost', :master_port);
+ master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+-- show that we support DROP CONSTRAINT
+ALTER TABLE reference_table DROP CONSTRAINT fkey_ref_to_local;
+ERROR:  constraint "fkey_ref_to_local" of relation "reference_table" does not exist
+ALTER TABLE reference_table ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  there is no unique constraint matching given keys for referenced table "local_table"
+-- show that DROP table errors out as expected
+DROP TABLE local_table;
+-- this should work
+DROP TABLE local_table CASCADE;
+ERROR:  table "local_table" does not exist
+-- DROP reference_table finally
+DROP TABLE reference_table;
+-- show that we can ADD foreign key constraint from/to a reference table that
+-- needs to be escaped
+CREATE TABLE local_table(l1 int primary key);
+CREATE TABLE "reference'table"(r1 int primary key);
+SELECT create_reference_table('reference''table');
+ create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+-- replicate reference table to coordinator
+SELECT master_add_node('localhost', :master_port, groupId => 0);
+NOTICE:  Replicating reference table "orders_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "customer" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "nation" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "part" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "supplier" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_right_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "multi_outer_join_third_reference" to the node localhost:xxxxx
+NOTICE:  Replicating reference table "reference'table" to the node localhost:xxxxx
+ master_add_node
+---------------------------------------------------------------------
+               6
+(1 row)
+
+-- foreign key from local table to reference table --
+-- these should work
+ALTER TABLE local_table ADD CONSTRAINT fkey_local_to_ref FOREIGN KEY(l1) REFERENCES "reference'table"(r1);
+INSERT INTO "reference'table" VALUES (21);
+INSERT INTO local_table VALUES (21);
+-- this should fail with an appropriate error message like we do for reference tables that
+-- do not need to be escaped
+INSERT INTO local_table VALUES (22);
+ERROR:  insert or update on table "local_table" violates foreign key constraint "fkey_local_to_ref"
+DETAIL:  Key (l1)=(22) is not present in table "reference'table".
+-- DROP CONSTRAINT for next commands
+ALTER TABLE local_table DROP CONSTRAINT fkey_local_to_ref;
+-- these should also work
+ALTER TABLE "reference'table" ADD CONSTRAINT fkey_ref_to_local FOREIGN KEY(r1) REFERENCES local_table(l1);
+ERROR:  cannot create foreign key constraint
+DETAIL:  Referenced table must be a distributed table or a reference table.
+INSERT INTO local_table VALUES (23);
+INSERT INTO "reference'table" VALUES (23);
+-- this should fail with an appropriate error message like we do for reference tables that
+-- do not need to be escaped
+INSERT INTO local_table VALUES (24);
+-- TODO: hooop
+-- DROP tables finally
+DROP TABLE local_table, "reference'table";
+--- CREATE TABLE commands defining foreign key constraint between local tables and reference tables ---
+-- remove master node from pg_dist_node for next tests to show that
+-- behaviour does not need us to add coordinator to pg_dist_node priorly,
+-- as it is not implemented in the ideal way (for now)
+SELECT master_remove_node('localhost', :master_port);
+ master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+-- create tables
+CREATE TABLE reference_table (r1 int);
+CREATE TABLE local_table (l1 int REFERENCES reference_table(r1));
+ERROR:  there is no unique constraint matching given keys for referenced table "reference_table"
+-- actually, we did not implement upgrading "a local table referenced by another local table"
+-- to a reference table yet -in an ideal way-. But it should work producing a warning
+SELECT create_reference_table("reference_table");
+ERROR:  column "reference_table" does not exist
+-- show that we are checking for foreign key constraint after defining
+-- this should fail
+INSERT INTO local_table VALUES (31);
+ERROR:  relation "local_table" does not exist
+INSERT INTO reference_table VALUES (31);
+-- this should work
+INSERT INTO local_table VALUES (31);
+ERROR:  relation "local_table" does not exist
+-- that amount of test for CREATE TABLE commands defining an foreign key constraint
+-- from a local table to a reference table is sufficient it is already tested
+-- in some other regression tests already
+-- DROP tables finally
+DROP TABLE local_table;
+ERROR:  table "local_table" does not exist
+DROP TABLE "reference'table";
+ERROR:  table "reference'table" does not exist
+-- create tables
+CREATE TABLE local_table (l1 int);
+CREATE TABLE reference_table (r1 int REFERENCES local_table(l1));
+ERROR:  relation "reference_table" already exists
+-- we did not implement upgrading "a local table referencing to another
+-- local table" to a reference table yet.
+-- this should fail
+SELECT create_reference_table("reference_table");
+ERROR:  column "reference_table" does not exist
+-- finalize the test, clear the schema created for this test --
+DROP SCHEMA fkey_reference_local_table;
+ERROR:  cannot drop schema fkey_reference_local_table because other objects depend on it
+DETAIL:  table reference_table_1190015 depends on schema fkey_reference_local_table
+table distributed_table depends on schema fkey_reference_local_table
+table reference_table_1190021 depends on schema fkey_reference_local_table
+table reference_table depends on schema fkey_reference_local_table
+table local_table depends on schema fkey_reference_local_table
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
