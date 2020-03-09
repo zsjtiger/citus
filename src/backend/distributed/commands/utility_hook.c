@@ -70,6 +70,8 @@ static bool shouldInvalidateForeignKeyGraph = false;
 static int activeAlterTables = 0;
 static int activeDropSchemaOrDBs = 0;
 
+/* assume always cascading for the direct usage of master_drop_all_shards */
+bool isDropCommandCascading = true;
 
 /* Local functions forward declarations for helper functions */
 static void ExecuteDistributedDDLJob(DDLJob *ddlJob);
@@ -455,6 +457,14 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 		StopMaintenanceDaemon(MyDatabaseId);
 	}
 
+	if (IsA(parsetree, DropStmt))
+	{
+		DropStmt *dropStmt = castNode(DropStmt, parsetree);
+
+		/* to set DROP behaviors of the DROP shard commands accordingly */
+		isDropCommandCascading = (dropStmt->behavior == DROP_CASCADE);
+	}
+
 	pstmt->utilityStmt = parsetree;
 
 	PG_TRY();
@@ -486,6 +496,9 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 
 		standard_ProcessUtility(pstmt, queryString, context,
 								params, queryEnv, dest, completionTag);
+
+		/* assume always cascading for the direct usage of master_drop_all_shards */
+		isDropCommandCascading = true;
 
 		/*
 		 * if we are running ALTER EXTENSION citus UPDATE (to "<version>") command, we may need

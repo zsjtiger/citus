@@ -32,6 +32,9 @@ extern bool EnableDependencyCreation;
 extern bool EnableCreateTypePropagation;
 extern bool EnableAlterRolePropagation;
 
+/* whether current DROP command is cascading or not */
+extern bool isDropCommandCascading;
+
 /*
  * A DDLJob encapsulates the remote tasks and commands needed to process all or
  * part of a distributed DDL command. It hold the distributed relation's oid,

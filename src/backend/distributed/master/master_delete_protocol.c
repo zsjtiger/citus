@@ -609,6 +609,11 @@ CreateDropShardPlacementCommand(const char *schemaName, const char *shardRelatio
 		Assert(false);
 	}
 
+	if (isDropCommandCascading)
+	{
+		appendStringInfo(workerDropQuery, " CASCADE");
+	}
+
 	return workerDropQuery->data;
 }
 
