@@ -109,6 +109,12 @@ BEGIN;
   TRUNCATE ref_table CASCADE;
 COMMIT;
 
+-- as we do not support local ANALYZE execution yet, below block would error out
+BEGIN;
+  TRUNCATE ref_table CASCADE;
+  ANALYZE ref_table;
+COMMIT;
+
 -- insert some data
 INSERT INTO ref_table VALUES(7);
 INSERT INTO dist_table VALUES(7);

@@ -602,12 +602,12 @@ NOTICE:  executing the command locally: SELECT count(*) AS count FROM local_shar
 
 	TRUNCATE distributed_table CASCADE;
 NOTICE:  truncate cascades to table "second_distributed_table"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470001 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470003 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470005 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470007 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
 ROLLBACK;
 -- a local query is followed by a command that cannot be executed locally
 BEGIN;
@@ -901,17 +901,17 @@ WHERE
 
 -- get ready for the next commands
 TRUNCATE reference_table, distributed_table, second_distributed_table;
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_1470000 CASCADE
-NOTICE:  truncate cascades to table "distributed_table_1470001"
-NOTICE:  truncate cascades to table "distributed_table_1470003"
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470001 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470003 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470005 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470007 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
 -- local execution of returning of reference tables
 INSERT INTO reference_table VALUES (1),(2),(3),(4),(5),(6) RETURNING *;
 NOTICE:  executing the command locally: INSERT INTO local_shard_execution.reference_table_1470000 AS citus_table_alias (key) VALUES (1), (2), (3), (4), (5), (6) RETURNING citus_table_alias.key
@@ -1337,17 +1337,17 @@ ROLLBACK;
 TRUNCATE reference_table CASCADE;
 NOTICE:  truncate cascades to table "distributed_table"
 NOTICE:  truncate cascades to table "second_distributed_table"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_1470000 CASCADE
-NOTICE:  truncate cascades to table "distributed_table_1470001"
-NOTICE:  truncate cascades to table "distributed_table_1470003"
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470001 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470003 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470005 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470007 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
 INSERT INTO reference_table SELECT i FROM generate_series(500, 600) i;
 INSERT INTO distributed_table SELECT i, i::text, i % 10 + 25 FROM generate_series(500, 600) i;
 -- show that both local, and mixed local-distributed executions
@@ -1617,17 +1617,17 @@ COMMIT;
 TRUNCATE reference_table CASCADE;
 NOTICE:  truncate cascades to table "distributed_table"
 NOTICE:  truncate cascades to table "second_distributed_table"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_1470000 CASCADE
-NOTICE:  truncate cascades to table "distributed_table_1470001"
-NOTICE:  truncate cascades to table "distributed_table_1470003"
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470001 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470005"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_1470003 CASCADE
-NOTICE:  truncate cascades to table "second_distributed_table_1470007"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470005 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_1470007 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.reference_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.distributed_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "second_distributed_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_shard_execution.second_distributed_table_xxxxx CASCADE
 -- load some data on a remote shard
 INSERT INTO reference_table (key) VALUES (2);
 NOTICE:  executing the command locally: INSERT INTO local_shard_execution.reference_table_1470000 (key) VALUES (2)

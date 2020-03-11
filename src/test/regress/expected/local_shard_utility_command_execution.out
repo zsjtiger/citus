@@ -51,29 +51,29 @@ INSERT INTO dist_table VALUES(1);
 -- case that coordinator have some local distributed table shards.
 TRUNCATE ref_table CASCADE;
 NOTICE:  truncate cascades to table "dist_table"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.ref_table_1500000 CASCADE
-NOTICE:  truncate cascades to table "dist_table_1500001"
-NOTICE:  truncate cascades to table "dist_table_1500004"
-NOTICE:  truncate cascades to table "dist_table_1500007"
-NOTICE:  truncate cascades to table "dist_table_1500010"
-NOTICE:  truncate cascades to table "dist_table_1500013"
-NOTICE:  truncate cascades to table "dist_table_1500016"
-NOTICE:  truncate cascades to table "dist_table_1500019"
-NOTICE:  truncate cascades to table "dist_table_1500022"
-NOTICE:  truncate cascades to table "dist_table_1500025"
-NOTICE:  truncate cascades to table "dist_table_1500028"
-NOTICE:  truncate cascades to table "dist_table_1500031"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500001 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500004 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500007 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500010 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500013 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500016 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500019 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500022 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500025 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500028 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500031 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.ref_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
 -- show that TRUNCATE is successfull
 SELECT COUNT(*) FROM ref_table, dist_table;
  count
@@ -96,17 +96,17 @@ NOTICE:  executing the command locally: SELECT count(*) AS count FROM local_comm
 (1 row)
 
   TRUNCATE dist_table;
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500001 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500004 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500007 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500010 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500013 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500016 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500019 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500022 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500025 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500028 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500031 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
 COMMIT;
 -- show that TRUNCATE is successfull
 SELECT COUNT(*) FROM dist_table;
@@ -193,35 +193,65 @@ BEGIN;
 NOTICE:  truncate cascades to table "dist_table"
 ERROR:  cannot execute DDL on reference table "ref_table" because there was a parallel SELECT access to distributed table "dist_table" in the same transaction
 COMMIT;
+-- as we do not support local ANALYZE execution yet, below block would error out
+BEGIN;
+  TRUNCATE ref_table CASCADE;
+NOTICE:  truncate cascades to table "dist_table"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.ref_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+  ANALYZE ref_table;
+ERROR:  cannot execute command because a local execution has accessed a placement in the transaction
+COMMIT;
 -- insert some data
 INSERT INTO ref_table VALUES(7);
 NOTICE:  executing the command locally: INSERT INTO local_commands_test_schema.ref_table_1500000 (a) VALUES (7)
 INSERT INTO dist_table VALUES(7);
 -- we can TRUNCATE those two tables within the same command
 TRUNCATE ref_table, dist_table;
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.ref_table_1500000 CASCADE
-NOTICE:  truncate cascades to table "dist_table_1500001"
-NOTICE:  truncate cascades to table "dist_table_1500004"
-NOTICE:  truncate cascades to table "dist_table_1500007"
-NOTICE:  truncate cascades to table "dist_table_1500010"
-NOTICE:  truncate cascades to table "dist_table_1500013"
-NOTICE:  truncate cascades to table "dist_table_1500016"
-NOTICE:  truncate cascades to table "dist_table_1500019"
-NOTICE:  truncate cascades to table "dist_table_1500022"
-NOTICE:  truncate cascades to table "dist_table_1500025"
-NOTICE:  truncate cascades to table "dist_table_1500028"
-NOTICE:  truncate cascades to table "dist_table_1500031"
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500001 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500004 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500007 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500010 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500013 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500016 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500019 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500022 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500025 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500028 CASCADE
-NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_1500031 CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.ref_table_xxxxx CASCADE
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  truncate cascades to table "dist_table_xxxxx"
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
 -- show that TRUNCATE is successfull
 SELECT COUNT(*) FROM ref_table, dist_table;
  count
@@ -239,7 +269,7 @@ ERROR:  cannot drop table ref_table because other objects depend on it
 DROP TABLE ref_table, dist_table;
 -- drop the other standalone table locally
 DROP TABLE ref_table_1;
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1_1500033 CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1_xxxxx CASCADE
 -- show that DROP commands are successfull
 SELECT tablename FROM pg_tables where schemaname='local_commands_test_schema' ORDER BY tablename;
  tablename
@@ -264,7 +294,7 @@ NOTICE:  executing the command locally: SELECT count(*) AS count FROM local_comm
 (1 row)
 
   DROP TABLE ref_table;
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1500034 CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_xxxxx CASCADE
 COMMIT;
 CREATE TABLE ref_table (a int primary key);
 SELECT create_reference_table('ref_table');
@@ -356,17 +386,17 @@ NOTICE:  executing the command locally: SELECT count(*) AS count FROM local_comm
 (1 row)
 
   DROP TABLE dist_table CASCADE;
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500100 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500103 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500106 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500109 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500112 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500115 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500118 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500121 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500124 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500127 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500130 CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
 ROLLBACK;
 -- show that DROP command is rollback'd successfully (should print 1)
 SELECT 1 FROM pg_tables where tablename='dist_table';
@@ -449,19 +479,19 @@ NOTICE:  executing the command locally: SELECT count(*) AS count FROM ((local_co
 
   -- observe DROP on a self-referencing table also works
   DROP TABLE ref_table_1, ref_table, dist_table;
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500100 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500103 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500106 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500109 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500112 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500115 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500118 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500121 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500124 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500127 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_1500130 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1500035 CASCADE
-NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1_1500132 CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.dist_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_xxxxx CASCADE
+NOTICE:  executing the command locally: DROP TABLE IF EXISTS local_commands_test_schema.ref_table_1_xxxxx CASCADE
   -- show that DROP command is successfull
   SELECT tablename FROM pg_tables where schemaname='local_commands_test_schema' ORDER BY tablename;
  tablename
