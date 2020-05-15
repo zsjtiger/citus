@@ -23,6 +23,7 @@
 #include "catalog/pg_type.h"
 #include "distributed/colocation_utils.h"
 #include "distributed/commands.h"
+#include "distributed/listutils.h"
 #include "distributed/master_protocol.h"
 #include "distributed/multi_join_order.h"
 #include "distributed/version_compat.h"
@@ -34,67 +35,48 @@
 #include "utils/syscache.h"
 
 /* Local functions forward declarations */
-static bool HeapTupleOfForeignConstraintIncludesColumn(HeapTuple heapTuple, Oid
-													   relationId, int pgConstraintKey,
+static bool HeapTupleOfForeignConstraintIncludesColumn(HeapTuple heapTuple,
+													   Oid relationId,
+													   int pgConstraintKey,
 													   char *columnName);
 static void ForeignConstraintFindDistKeys(HeapTuple pgConstraintTuple,
 										  Var *referencingDistColumn,
 										  Var *referencedDistColumn,
 										  int *referencingAttrIndex,
 										  int *referencedAttrIndex);
+static List * GetTableForeignConstraintCommandsInternal(Oid relationOid,
+														AttrNumber attributeNumber,
+														bool excludeSelfReference);
 static Oid get_relation_constraint_oid_compat(HeapTuple heapTuple);
+static List * ForeignKeysToReferenceTables(Oid relationOid, bool findAll);
+static List * GetTableForeignConstraintOidsInternal(Oid relationOid,
+													AttrNumber attributeNumber,
+													bool excludeSelfReference,
+													bool findAll);
 
 /*
  * ConstraintIsAForeignKeyToReferenceTable checks if the given constraint is a
- * foreign key constraint from the given relation to a reference table. It does
- * that by scanning pg_constraint for foreign key constraints.
+ * foreign key constraint from the given relation to a reference table.
  */
 bool
-ConstraintIsAForeignKeyToReferenceTable(char *constraintName, Oid relationId)
+ConstraintIsAForeignKeyToReferenceTable(char *constraintNameInput, Oid relationOid)
 {
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-	bool foreignKeyToReferenceTable = false;
+	bool findAll = true;
+	List *foreignKeysToReferenceTables = ForeignKeysToReferenceTables(relationOid,
+																	  findAll);
 
-
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_contype, BTEqualStrategyNumber, F_CHAREQ,
-				CharGetDatum(CONSTRAINT_FOREIGN));
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint, InvalidOid, false,
-													NULL, scanKeyCount, scanKey);
-
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	while (HeapTupleIsValid(heapTuple))
+	Oid tableForeignConstraintOid = InvalidOid;
+	foreach_oid(tableForeignConstraintOid, foreignKeysToReferenceTables)
 	{
-		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
-		char *tupleConstraintName = (constraintForm->conname).data;
+		char *constraintName = get_constraint_name(tableForeignConstraintOid);
 
-		if (strncmp(constraintName, tupleConstraintName, NAMEDATALEN) != 0 ||
-			constraintForm->conrelid != relationId)
+		if (strncmp(constraintName, constraintNameInput, NAMEDATALEN) == 0)
 		{
-			heapTuple = systable_getnext(scanDescriptor);
-			continue;
+			return true;
 		}
-
-		Oid referencedTableId = constraintForm->confrelid;
-
-		Assert(IsCitusTable(referencedTableId));
-
-		if (PartitionMethod(referencedTableId) == DISTRIBUTE_BY_NONE)
-		{
-			foreignKeyToReferenceTable = true;
-			break;
-		}
-
-		heapTuple = systable_getnext(scanDescriptor);
 	}
 
-	/* clean up scan and close system catalog */
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, AccessShareLock);
-
-	return foreignKeyToReferenceTable;
+	return false;
 }
 
 
@@ -400,9 +382,7 @@ ForeignConstraintFindDistKeys(HeapTuple pgConstraintTuple,
 
 /*
  * ColumnAppearsInForeignKeyToReferenceTable checks if there is a foreign key
- * constraint from/to a reference table on the given column. We iterate
- * pg_constraint to fetch the constraint on the given relationId and find
- * if any of the constraints includes the given column.
+ * constraint from/to a reference table on the given column.
  */
 bool
 ColumnAppearsInForeignKeyToReferenceTable(char *columnName, Oid relationId)
@@ -469,23 +449,45 @@ ColumnAppearsInForeignKeyToReferenceTable(char *columnName, Oid relationId)
 
 	/* clean up scan and close system catalog */
 	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, AccessShareLock);
+	heap_close(pgConstraint, NoLock);
 
 	return foreignKeyToReferenceTableIncludesGivenColumn;
 }
 
 
 /*
- * GetTableForeignConstraints takes in a relationId, and returns the list of foreign
- * constraint commands needed to reconstruct foreign constraints of that table.
+ * GetForeignConstraintCommandsTableReferencing takes in a relationId, and
+ * returns the list of foreign constraint commands needed to reconstruct
+ * foreign key constraints that the table is involved in as the "referencing"
+ * one.
  */
 List *
-GetTableForeignConstraintCommands(Oid relationId)
+GetForeignConstraintCommandsTableReferencing(Oid relationOid)
 {
-	List *tableForeignConstraints = NIL;
+	bool excludeSelfReference = false;
+	return GetTableForeignConstraintCommandsInternal(relationOid,
+													 Anum_pg_constraint_conrelid,
+													 excludeSelfReference);
+}
 
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
+
+/*
+ * GetTableForeignConstraintCommandsInternal is a wrapper function to get the
+ * DDL commands to recreate the foreign key constraints returned by
+ * GetTableForeignConstraintOidsInternal. See more details at the underlying
+ * function.
+ */
+static List *
+GetTableForeignConstraintCommandsInternal(Oid relationOid, AttrNumber attributeNumber,
+										  bool excludeSelfReference)
+{
+	bool findAll = true;
+	List *tableForeignConstraintOids = GetTableForeignConstraintOidsInternal(relationOid,
+																			 attributeNumber,
+																			 excludeSelfReference,
+																			 findAll);
+
+	List *tableForeignConstraintCommands = NIL;
 
 	/*
 	 * Set search_path to NIL so that all objects outside of pg_catalog will be
@@ -497,41 +499,19 @@ GetTableForeignConstraintCommands(Oid relationId)
 	overridePath->addCatalog = true;
 	PushOverrideSearchPath(overridePath);
 
-	/* open system catalog and scan all constraints that belong to this table */
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_conrelid, BTEqualStrategyNumber, F_OIDEQ,
-				relationId);
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint,
-													ConstraintRelidTypidNameIndexId,
-													true, NULL,
-													scanKeyCount, scanKey);
-
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	while (HeapTupleIsValid(heapTuple))
+	Oid tableForeignConstraintOid = InvalidOid;
+	foreach_oid(tableForeignConstraintOid, tableForeignConstraintOids)
 	{
-		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
+		char *statementDef = pg_get_constraintdef_command(tableForeignConstraintOid);
 
-		bool inheritedConstraint = OidIsValid(constraintForm->conparentid);
-
-		if (!inheritedConstraint && constraintForm->contype == CONSTRAINT_FOREIGN)
-		{
-			Oid constraintId = get_relation_constraint_oid_compat(heapTuple);
-			char *statementDef = pg_get_constraintdef_command(constraintId);
-
-			tableForeignConstraints = lappend(tableForeignConstraints, statementDef);
-		}
-
-		heapTuple = systable_getnext(scanDescriptor);
+		tableForeignConstraintCommands = lappend(tableForeignConstraintCommands,
+												 statementDef);
 	}
-
-	/* clean up scan and close system catalog */
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, AccessShareLock);
 
 	/* revert back to original search_path */
 	PopOverrideSearchPath();
 
-	return tableForeignConstraints;
+	return tableForeignConstraintCommands;
 }
 
 
@@ -561,106 +541,79 @@ get_relation_constraint_oid_compat(HeapTuple heapTuple)
 
 
 /*
- * HasForeignKeyToReferenceTable function scans the pgConstraint table to
- * fetch all of the constraints on the given relationId and see if at least one
- * of them is a foreign key referencing to a reference table.
+ * HasForeignKeyToReferenceTable function returns true if any of the foreign
+ * key constraints on the relation with relationOid references to a reference
+ * table.
  */
 bool
-HasForeignKeyToReferenceTable(Oid relationId)
+HasForeignKeyToReferenceTable(Oid relationOid)
 {
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-	bool hasForeignKeyToReferenceTable = false;
+	bool findAll = false;
+	return ForeignKeysToReferenceTables(relationOid, findAll) != NIL;
+}
 
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_conrelid, BTEqualStrategyNumber, F_OIDEQ,
-				relationId);
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint,
-													ConstraintRelidTypidNameIndexId,
-													true, NULL,
-													scanKeyCount, scanKey);
 
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	while (HeapTupleIsValid(heapTuple))
+/*
+ * ForeignKeysToReferenceTables function returns list of OIDs for the foreign
+ * key constraints on the given relationId that are referencing to reference
+ * tables.
+ */
+static List *
+ForeignKeysToReferenceTables(Oid relationOid, bool findAll)
+{
+	bool excludeSelfReference = false;
+	List *tableForeignConstraintOids = GetTableForeignConstraintOidsInternal(relationOid,
+																			 Anum_pg_constraint_conrelid,
+																			 excludeSelfReference,
+																			 true); /* findAll */
+
+	List *fkeyOidsToReferenceTables = NIL;
+
+	Oid tableForeignConstraintOid = InvalidOid;
+	foreach_oid(tableForeignConstraintOid, tableForeignConstraintOids)
 	{
-		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
+		HeapTuple heapTuple = SearchSysCache1(CONSTROID, ObjectIdGetDatum(
+												  tableForeignConstraintOid));
 
-		if (constraintForm->contype != CONSTRAINT_FOREIGN)
-		{
-			heapTuple = systable_getnext(scanDescriptor);
-			continue;
-		}
+		Assert(HeapTupleIsValid(heapTuple));
+
+		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
 
 		Oid referencedTableId = constraintForm->confrelid;
 
-		if (!IsCitusTable(referencedTableId))
+		if (!IsCitusTable(referencedTableId) || (PartitionMethod(referencedTableId) !=
+												 DISTRIBUTE_BY_NONE))
 		{
-			heapTuple = systable_getnext(scanDescriptor);
+			ReleaseSysCache(heapTuple);
 			continue;
 		}
 
-		if (PartitionMethod(referencedTableId) == DISTRIBUTE_BY_NONE)
+		fkeyOidsToReferenceTables = lappend_oid(fkeyOidsToReferenceTables,
+												tableForeignConstraintOid);
+
+		ReleaseSysCache(heapTuple);
+
+		if (!findAll)
 		{
-			hasForeignKeyToReferenceTable = true;
 			break;
 		}
-
-		heapTuple = systable_getnext(scanDescriptor);
 	}
 
-	/* clean up scan and close system catalog */
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, NoLock);
-	return hasForeignKeyToReferenceTable;
+	return fkeyOidsToReferenceTables;
 }
 
 
 /*
  * TableReferenced function checks whether given table is referenced by another table
- * via foreign constraints. If it is referenced, this function returns true. To check
- * that, this function searches for the given relation in the pg_constraint system
- * catalog table. However since there are no indexes for the column we search for,
- * this function performs sequential search. So call this function with caution.
+ * via foreign constraints. If it is referenced, this function returns true.
  */
 bool
 TableReferenced(Oid relationId)
 {
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-	Oid scanIndexId = InvalidOid;
-	bool useIndex = false;
-
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_confrelid, BTEqualStrategyNumber, F_OIDEQ,
-				relationId);
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint, scanIndexId, useIndex,
-													NULL,
-													scanKeyCount, scanKey);
-
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-
-	while (HeapTupleIsValid(heapTuple))
-	{
-		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
-
-		if (constraintForm->contype == CONSTRAINT_FOREIGN)
-		{
-			systable_endscan(scanDescriptor);
-			heap_close(pgConstraint, NoLock);
-
-			return true;
-		}
-
-		heapTuple = systable_getnext(scanDescriptor);
-	}
-
-	/* clean up scan and close system catalog */
-
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, NoLock);
-
-	return false;
+	bool excludeSelfReference = false;
+	bool findAll = false;
+	return GetTableForeignConstraintOidsInternal(relationId, Anum_pg_constraint_confrelid,
+												 excludeSelfReference, findAll) != NIL;
 }
 
 
@@ -696,39 +649,118 @@ HeapTupleOfForeignConstraintIncludesColumn(HeapTuple heapTuple, Oid relationId,
 
 
 /*
- * TableReferencing function checks whether given table is referencing by another table
- * via foreign constraints. If it is referencing, this function returns true. To check
- * that, this function searches given relation at pg_constraints system catalog. However
- * since there is no index for the column we searched, this function performs sequential
- * search, therefore call this function with caution.
+ * TableReferencing function checks whether given table is referenced to another
+ * table via foreign key constraints. If it is referencing, this function returns
+ * true.
  */
 bool
 TableReferencing(Oid relationId)
 {
+	bool excludeSelfReference = false;
+	bool findAll = false;
+	return GetTableForeignConstraintOidsInternal(relationId, Anum_pg_constraint_conrelid,
+												 excludeSelfReference, findAll) != NIL;
+}
+
+
+/*
+ * ConstraintIsAForeignKey returns true if the given constraint name
+ * is a foreign key defined on the relation.
+ */
+bool
+ConstraintIsAForeignKey(char *constraintNameInput, Oid relationOid)
+{
+	bool excludeSelfReference = false;
+	bool findAll = true;
+	List *foreignKeys = GetTableForeignConstraintOidsInternal(relationOid,
+															  Anum_pg_constraint_conrelid,
+															  excludeSelfReference,
+															  findAll);
+
+	Oid tableForeignConstraintOid = InvalidOid;
+	foreach_oid(tableForeignConstraintOid, foreignKeys)
+	{
+		char *constraintName = get_constraint_name(tableForeignConstraintOid);
+
+		if (strncmp(constraintName, constraintNameInput, NAMEDATALEN) == 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
+/*
+ * GetTableForeignConstraintOidsInternal takes in a relationId, and returns
+ * the list of OIDs for foreign constraints that the relation with relationId
+ * is involved according to "attributeNumber" argument. In that sense,
+ * "attributeNumber" should be:
+ *  - "Anum_pg_constraint_conrelid" to get the ones in which our relation is
+ *    the "referencing" one, and
+ *  - "Anum_pg_constraint_confrelid" to get the ones in which our relation is
+ *    the "referenced" one.
+ * Note that since there is no index for the column Anum_pg_constraint_confrelid,
+ * this function performs sequential scan on pg_constraint in that case.
+ *
+ * Self-referencing foreign keys will not be considered if excludeSelfReference
+ * is true.
+ */
+static List *
+GetTableForeignConstraintOidsInternal(Oid relationId, AttrNumber attributeNumber,
+									  bool excludeSelfReference, bool findAll)
+{
+	Assert(attributeNumber == Anum_pg_constraint_conrelid ||
+		   attributeNumber == Anum_pg_constraint_confrelid);
+
+	List *tableForeignConstraintOids = NIL;
+
 	ScanKeyData scanKey[1];
 	int scanKeyCount = 1;
-	Oid scanIndexId = InvalidOid;
-	bool useIndex = false;
+	bool indexOk = (attributeNumber == Anum_pg_constraint_conrelid) ? true : false;
 
 	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_conrelid, BTEqualStrategyNumber, F_OIDEQ,
+	ScanKeyInit(&scanKey[0], attributeNumber, BTEqualStrategyNumber, F_OIDEQ,
 				relationId);
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint, scanIndexId, useIndex,
-													NULL,
-													scanKeyCount, scanKey);
+	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint,
+													ConstraintRelidTypidNameIndexId,
+													indexOk, NULL, scanKeyCount,
+													scanKey);
 
 	HeapTuple heapTuple = systable_getnext(scanDescriptor);
 	while (HeapTupleIsValid(heapTuple))
 	{
 		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
 
-		if (constraintForm->contype == CONSTRAINT_FOREIGN)
+		if (constraintForm->contype != CONSTRAINT_FOREIGN)
 		{
-			systable_endscan(scanDescriptor);
-			heap_close(pgConstraint, NoLock);
+			heapTuple = systable_getnext(scanDescriptor);
+			continue;
+		}
 
-			return true;
+		bool inheritedConstraint = OidIsValid(constraintForm->conparentid);
+		if (inheritedConstraint)
+		{
+			heapTuple = systable_getnext(scanDescriptor);
+			continue;
+		}
+
+		Oid constraintId = get_relation_constraint_oid_compat(heapTuple);
+
+		if (excludeSelfReference && (constraintForm->conrelid ==
+									 constraintForm->confrelid))
+		{
+			heapTuple = systable_getnext(scanDescriptor);
+			continue;
+		}
+
+		tableForeignConstraintOids = lappend_oid(tableForeignConstraintOids,
+												 constraintId);
+
+		if (!findAll)
+		{
+			break;
 		}
 
 		heapTuple = systable_getnext(scanDescriptor);
@@ -737,48 +769,5 @@ TableReferencing(Oid relationId)
 	systable_endscan(scanDescriptor);
 	heap_close(pgConstraint, NoLock);
 
-	return false;
-}
-
-
-/*
- * ConstraintIsAForeignKey returns true if the given constraint name
- * is a foreign key to defined on the relation.
- */
-bool
-ConstraintIsAForeignKey(char *constraintNameInput, Oid relationId)
-{
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_contype, BTEqualStrategyNumber, F_CHAREQ,
-				CharGetDatum(CONSTRAINT_FOREIGN));
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint, InvalidOid, false,
-													NULL, scanKeyCount, scanKey);
-
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	while (HeapTupleIsValid(heapTuple))
-	{
-		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
-		char *constraintName = (constraintForm->conname).data;
-
-		if (strncmp(constraintName, constraintNameInput, NAMEDATALEN) == 0 &&
-			constraintForm->conrelid == relationId)
-		{
-			systable_endscan(scanDescriptor);
-			heap_close(pgConstraint, AccessShareLock);
-
-			return true;
-		}
-
-		heapTuple = systable_getnext(scanDescriptor);
-	}
-
-	/* clean up scan and close system catalog */
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, AccessShareLock);
-
-	return false;
+	return tableForeignConstraintOids;
 }

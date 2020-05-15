@@ -101,8 +101,8 @@ extern void ErrorIfUnsupportedForeignConstraintExists(Relation relation,
 													  uint32 colocationId);
 extern bool ColumnAppearsInForeignKeyToReferenceTable(char *columnName, Oid
 													  relationId);
-extern List * GetTableForeignConstraintCommands(Oid relationId);
-extern bool HasForeignKeyToReferenceTable(Oid relationId);
+extern List * GetForeignConstraintCommandsTableReferencing(Oid relationId);
+extern bool HasForeignKeyToReferenceTable(Oid relationOid);
 extern bool TableReferenced(Oid relationId);
 extern bool TableReferencing(Oid relationId);
 extern bool ConstraintIsAForeignKey(char *constraintName, Oid relationId);
