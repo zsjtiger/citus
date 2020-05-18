@@ -18,6 +18,7 @@
 #include "nodes/pg_list.h"
 #include "utils/array.h"
 #include "utils/hsearch.h"
+#include "distributed/version_compat.h"
 
 
 /*
@@ -39,7 +40,7 @@
 	for (ListCell *(var ## CellDoNotUse) = list_head(l); \
 		 (var ## CellDoNotUse) != NULL && \
 		 (((var) = lfirst(var ## CellDoNotUse)) || true); \
-		 var ## CellDoNotUse = lnext(l, var ## CellDoNotUse))
+		 var ## CellDoNotUse = lnext_compat(l, var ## CellDoNotUse))
 
 
 /*
@@ -52,7 +53,7 @@
 	for (ListCell *(var ## CellDoNotUse) = list_head(l); \
 		 (var ## CellDoNotUse) != NULL && \
 		 (((var) = lfirst_int(var ## CellDoNotUse)) || true); \
-		 var ## CellDoNotUse = lnext(l, var ## CellDoNotUse))
+		 var ## CellDoNotUse = lnext_compat(l, var ## CellDoNotUse))
 
 
 /*
@@ -65,7 +66,7 @@
 	for (ListCell *(var ## CellDoNotUse) = list_head(l); \
 		 (var ## CellDoNotUse) != NULL && \
 		 (((var) = lfirst_oid(var ## CellDoNotUse)) || true); \
-		 var ## CellDoNotUse = lnext(l, var ## CellDoNotUse))
+		 var ## CellDoNotUse = lnext_compat(l, var ## CellDoNotUse))
 
 
 /* utility functions declaration shared within this module */
