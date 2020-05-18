@@ -50,11 +50,10 @@ static List * GetTableForeignConstraintCommandsInternal(Oid relationOid,
 														AttrNumber attributeNumber,
 														bool excludeSelfReference);
 static Oid get_relation_constraint_oid_compat(HeapTuple heapTuple);
-static List * GetForeignKeyOidsToReferenceTables(Oid relationOid, bool findAll);
+static List * GetForeignKeyOidsToReferenceTables(Oid relationOid);
 static List * GetTableForeignConstraintOidsInternal(Oid relationOid,
 													AttrNumber attributeNumber,
-													bool excludeSelfReference,
-													bool findAll);
+													bool excludeSelfReference);
 
 /*
  * ConstraintIsAForeignKeyToReferenceTable checks if the given constraint is a
@@ -63,8 +62,7 @@ static List * GetTableForeignConstraintOidsInternal(Oid relationOid,
 bool
 ConstraintIsAForeignKeyToReferenceTable(char *inputConstaintName, Oid relationOid)
 {
-	bool findAll = true;
-	List *foreignKeyOids = GetForeignKeyOidsToReferenceTables(relationOid, findAll);
+	List *foreignKeyOids = GetForeignKeyOidsToReferenceTables(relationOid);
 
 	Oid foreignKeyOid = FindForeignKeyOidWithName(foreignKeyOids, inputConstaintName);
 
@@ -473,11 +471,9 @@ static List *
 GetTableForeignConstraintCommandsInternal(Oid relationOid, AttrNumber attributeNumber,
 										  bool excludeSelfReference)
 {
-	bool findAll = true;
 	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
 																 attributeNumber,
-																 excludeSelfReference,
-																 findAll);
+																 excludeSelfReference);
 
 	List *foreignKeyCommands = NIL;
 
@@ -539,8 +535,7 @@ get_relation_constraint_oid_compat(HeapTuple heapTuple)
 bool
 HasForeignKeyToReferenceTable(Oid relationOid)
 {
-	bool findAll = false;
-	return GetForeignKeyOidsToReferenceTables(relationOid, findAll) != NIL;
+	return list_length(GetForeignKeyOidsToReferenceTables(relationOid)) > 0;
 }
 
 
@@ -550,13 +545,12 @@ HasForeignKeyToReferenceTable(Oid relationOid)
  * reference tables.
  */
 static List *
-GetForeignKeyOidsToReferenceTables(Oid relationOid, bool findAll)
+GetForeignKeyOidsToReferenceTables(Oid relationOid)
 {
 	bool excludeSelfReference = false;
 	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
 																 Anum_pg_constraint_conrelid,
-																 excludeSelfReference,
-																 true); /* findAll */
+																 excludeSelfReference);
 
 	List *fkeyOidsToReferenceTables = NIL;
 
@@ -582,11 +576,6 @@ GetForeignKeyOidsToReferenceTables(Oid relationOid, bool findAll)
 		fkeyOidsToReferenceTables = lappend_oid(fkeyOidsToReferenceTables, foreignKeyOid);
 
 		ReleaseSysCache(heapTuple);
-
-		if (!findAll)
-		{
-			break;
-		}
 	}
 
 	return fkeyOidsToReferenceTables;
@@ -601,10 +590,9 @@ bool
 TableReferenced(Oid relationOid)
 {
 	bool excludeSelfReference = false;
-	bool findAll = false;
-	return GetTableForeignConstraintOidsInternal(relationOid,
-												 Anum_pg_constraint_confrelid,
-												 excludeSelfReference, findAll) != NIL;
+	return list_length(GetTableForeignConstraintOidsInternal(relationOid,
+															 Anum_pg_constraint_confrelid,
+															 excludeSelfReference)) > 0;
 }
 
 
@@ -648,9 +636,9 @@ bool
 TableReferencing(Oid relationOid)
 {
 	bool excludeSelfReference = false;
-	bool findAll = false;
-	return GetTableForeignConstraintOidsInternal(relationOid, Anum_pg_constraint_conrelid,
-												 excludeSelfReference, findAll) != NIL;
+	return list_length(GetTableForeignConstraintOidsInternal(relationOid,
+															 Anum_pg_constraint_conrelid,
+															 excludeSelfReference)) > 0;
 }
 
 
@@ -662,11 +650,9 @@ bool
 ConstraintIsAForeignKey(char *inputConstaintName, Oid relationOid)
 {
 	bool excludeSelfReference = false;
-	bool findAll = true;
 	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
 																 Anum_pg_constraint_conrelid,
-																 excludeSelfReference,
-																 findAll);
+																 excludeSelfReference);
 
 	Oid foreignKeyOid = FindForeignKeyOidWithName(foreignKeyOids, inputConstaintName);
 
@@ -715,7 +701,7 @@ FindForeignKeyOidWithName(List *foreignKeyOids, const char *inputConstraintName)
  */
 static List *
 GetTableForeignConstraintOidsInternal(Oid relationOid, AttrNumber attributeNumber,
-									  bool excludeSelfReference, bool findAll)
+									  bool excludeSelfReference)
 {
 	Assert(attributeNumber == Anum_pg_constraint_conrelid ||
 		   attributeNumber == Anum_pg_constraint_confrelid);
@@ -762,11 +748,6 @@ GetTableForeignConstraintOidsInternal(Oid relationOid, AttrNumber attributeNumbe
 		}
 
 		foreignKeyOids = lappend_oid(foreignKeyOids, constraintId);
-
-		if (!findAll)
-		{
-			break;
-		}
 
 		heapTuple = systable_getnext(scanDescriptor);
 	}
