@@ -29,6 +29,8 @@
 #include "miscadmin.h"
 #include <unistd.h>
 
+#include "distributed/pg_version_constants.h"
+
 #include "commands/dbcommands.h"
 #include "distributed/citus_safe_lib.h"
 #include "distributed/listutils.h"
@@ -50,6 +52,9 @@
 #include "storage/proc.h"
 #include "storage/shmem.h"
 #include "utils/guc.h"
+#if PG_VERSION_NUM >= PG_VERSION_13 
+#include "common/hashfn.h"
+#endif
 #include "utils/memutils.h"
 
 

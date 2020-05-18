@@ -20,6 +20,8 @@
 #include "postgres.h"
 #include "miscadmin.h"
 
+#include "distributed/pg_version_constants.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
 #include <math.h>
@@ -47,6 +49,11 @@
 #include "storage/fd.h"
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
+
+#if PG_VERSION_NUM >= PG_VERSION_13 
+#include "common/hashfn.h"
+#endif
+
 #include "utils/timestamp.h"
 
 

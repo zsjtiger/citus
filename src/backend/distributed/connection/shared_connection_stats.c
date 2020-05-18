@@ -32,11 +32,10 @@
 #include "distributed/tuplestore.h"
 #include "utils/builtins.h"
 #if PG_VERSION_NUM < PG_VERSION_13
-#include "utils/hashutils.h"
+#include "utils/hsearch.h"
 #else
 #include "common/hashfn.h"
 #endif
-#include "utils/hsearch.h"
 #include "storage/ipc.h"
 
 
