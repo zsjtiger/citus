@@ -169,7 +169,7 @@ CoordinatorInsertSelectExecScanInternal(CustomScanState *node)
 
 		/* plan the subquery, this may be another distributed query */
 		int cursorOptions = CURSOR_OPT_PARALLEL_OK;
-		PlannedStmt *selectPlan = pg_plan_query(selectQuery, cursorOptions,
+		PlannedStmt *selectPlan = pg_plan_query_compat(selectQuery, NULL, cursorOptions,
 												paramListInfo);
 
 		/*
