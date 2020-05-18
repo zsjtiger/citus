@@ -21,6 +21,7 @@
 #include "distributed/master_protocol.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/shardinterval_utils.h"
+#include "distributed/version_compat.h"
 #include "lib/stringinfo.h"
 #include "nodes/pg_list.h"
 #include "pgstat.h"

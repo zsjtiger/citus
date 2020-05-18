@@ -46,6 +46,7 @@
 #include "distributed/metadata_sync.h"
 #include "distributed/multi_executor.h"
 #include "distributed/relation_access_tracking.h"
+#include "distributed/version_compat.h"
 #include "distributed/worker_create_or_replace.h"
 #include "distributed/worker_transaction.h"
 #include "nodes/makefuncs.h"
