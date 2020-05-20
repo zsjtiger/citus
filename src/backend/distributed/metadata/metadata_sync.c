@@ -410,7 +410,7 @@ MetadataCreateCommands(void)
 	foreach_ptr(cacheEntry, propagatedTableList)
 	{
 		List *foreignConstraintCommands =
-			GetForeignConstraintCommandsTableReferencing(cacheEntry->relationId);
+			GetReferencingForeignConstaintCommands(cacheEntry->relationId);
 
 		metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
 												  foreignConstraintCommands);
@@ -498,7 +498,7 @@ GetDistributedTableDDLEvents(Oid relationId)
 
 	/* commands to create foreign key constraints */
 	List *foreignConstraintCommands =
-		GetForeignConstraintCommandsTableReferencing(relationId);
+		GetReferencingForeignConstaintCommands(relationId);
 	commandList = list_concat(commandList, foreignConstraintCommands);
 
 	/* commands to create partitioning hierarchy */

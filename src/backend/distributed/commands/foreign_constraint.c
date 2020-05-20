@@ -26,6 +26,7 @@
 #include "distributed/listutils.h"
 #include "distributed/master_protocol.h"
 #include "distributed/multi_join_order.h"
+#include "distributed/reference_table_utils.h"
 #include "distributed/version_compat.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
@@ -33,6 +34,14 @@
 #include "utils/relcache.h"
 #include "utils/ruleutils.h"
 #include "utils/syscache.h"
+
+/*
+ * Flags that can be passed to GetTableForeignConstraintOidsInternal to indicate
+ * which foreign key constraint OIDs are to be extracted
+ */
+#define EXTRACT_REFERENCING_CONSTRAINTS 0x0001
+#define EXTRACT_REFERENCED_CONSTRAINTS 0x0010
+#define EXCLUDE_SELF_REFERENCES 0x0100
 
 /* Local functions forward declarations */
 static bool HeapTupleOfForeignConstraintIncludesColumn(HeapTuple heapTuple,
@@ -47,13 +56,11 @@ static void ForeignConstraintFindDistKeys(HeapTuple pgConstraintTuple,
 										  int *referencingAttrIndex,
 										  int *referencedAttrIndex);
 static List * GetTableForeignConstraintCommandsInternal(Oid relationOid,
-														AttrNumber attributeNumber,
-														bool excludeSelfReference);
+														int flags);
 static Oid get_relation_constraint_oid_compat(HeapTuple heapTuple);
 static List * GetForeignKeyOidsToReferenceTables(Oid relationOid);
 static List * GetTableForeignConstraintOidsInternal(Oid relationOid,
-													AttrNumber attributeNumber,
-													bool excludeSelfReference);
+													int flags);
 
 /*
  * ConstraintIsAForeignKeyToReferenceTable checks if the given constraint is a
@@ -446,18 +453,16 @@ ColumnAppearsInForeignKeyToReferenceTable(char *columnName, Oid relationId)
 
 
 /*
- * GetForeignConstraintCommandsTableReferencing takes in a relationOid, and
+ * GetReferencingForeignConstaintCommands takes in a relationOid, and
  * returns the list of foreign constraint commands needed to reconstruct
  * foreign key constraints that the table is involved in as the "referencing"
  * one.
  */
 List *
-GetForeignConstraintCommandsTableReferencing(Oid relationOid)
+GetReferencingForeignConstaintCommands(Oid relationOid)
 {
-	bool excludeSelfReference = false;
-	return GetTableForeignConstraintCommandsInternal(relationOid,
-													 Anum_pg_constraint_conrelid,
-													 excludeSelfReference);
+	int flags = EXTRACT_REFERENCING_CONSTRAINTS;
+	return GetTableForeignConstraintCommandsInternal(relationOid, flags);
 }
 
 
@@ -468,12 +473,9 @@ GetForeignConstraintCommandsTableReferencing(Oid relationOid)
  * function.
  */
 static List *
-GetTableForeignConstraintCommandsInternal(Oid relationOid, AttrNumber attributeNumber,
-										  bool excludeSelfReference)
+GetTableForeignConstraintCommandsInternal(Oid relationOid, int flags)
 {
-	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
-																 attributeNumber,
-																 excludeSelfReference);
+	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid, flags);
 
 	List *foreignKeyCommands = NIL;
 
@@ -535,7 +537,10 @@ get_relation_constraint_oid_compat(HeapTuple heapTuple)
 bool
 HasForeignKeyToReferenceTable(Oid relationOid)
 {
-	return list_length(GetForeignKeyOidsToReferenceTables(relationOid)) > 0;
+	List *tableForeignKeyOidsToReferenceTables =
+		GetForeignKeyOidsToReferenceTables(relationOid);
+
+	return list_length(tableForeignKeyOidsToReferenceTables) > 0;
 }
 
 
@@ -547,10 +552,8 @@ HasForeignKeyToReferenceTable(Oid relationOid)
 static List *
 GetForeignKeyOidsToReferenceTables(Oid relationOid)
 {
-	bool excludeSelfReference = false;
-	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
-																 Anum_pg_constraint_conrelid,
-																 excludeSelfReference);
+	int flags = EXTRACT_REFERENCING_CONSTRAINTS;
+	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid, flags);
 
 	List *fkeyOidsToReferenceTables = NIL;
 
@@ -564,10 +567,9 @@ GetForeignKeyOidsToReferenceTables(Oid relationOid)
 
 		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
 
-		Oid referencedTableId = constraintForm->confrelid;
+		Oid referencedTableOid = constraintForm->confrelid;
 
-		if (!IsCitusTable(referencedTableId) || (PartitionMethod(referencedTableId) !=
-												 DISTRIBUTE_BY_NONE))
+		if (!IsReferenceTable(referencedTableOid))
 		{
 			ReleaseSysCache(heapTuple);
 			continue;
@@ -589,10 +591,11 @@ GetForeignKeyOidsToReferenceTables(Oid relationOid)
 bool
 TableReferenced(Oid relationOid)
 {
-	bool excludeSelfReference = false;
-	return list_length(GetTableForeignConstraintOidsInternal(relationOid,
-															 Anum_pg_constraint_confrelid,
-															 excludeSelfReference)) > 0;
+	int flags = EXTRACT_REFERENCED_CONSTRAINTS;
+	List *tableReferencedForeignConstraintOids = GetTableForeignConstraintOidsInternal(
+		relationOid, flags);
+
+	return list_length(tableReferencedForeignConstraintOids) > 0;
 }
 
 
@@ -635,10 +638,11 @@ HeapTupleOfForeignConstraintIncludesColumn(HeapTuple heapTuple, Oid relationId,
 bool
 TableReferencing(Oid relationOid)
 {
-	bool excludeSelfReference = false;
-	return list_length(GetTableForeignConstraintOidsInternal(relationOid,
-															 Anum_pg_constraint_conrelid,
-															 excludeSelfReference)) > 0;
+	int flags = EXTRACT_REFERENCING_CONSTRAINTS;
+	List *tableReferencingForeignConstraintOids = GetTableForeignConstraintOidsInternal(
+		relationOid, flags);
+
+	return list_length(tableReferencingForeignConstraintOids) > 0;
 }
 
 
@@ -649,10 +653,8 @@ TableReferencing(Oid relationOid)
 bool
 ConstraintIsAForeignKey(char *inputConstaintName, Oid relationOid)
 {
-	bool excludeSelfReference = false;
-	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid,
-																 Anum_pg_constraint_conrelid,
-																 excludeSelfReference);
+	int flags = EXTRACT_REFERENCING_CONSTRAINTS;
+	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(relationOid, flags);
 
 	Oid foreignKeyOid = FindForeignKeyOidWithName(foreignKeyOids, inputConstaintName);
 
@@ -687,29 +689,46 @@ FindForeignKeyOidWithName(List *foreignKeyOids, const char *inputConstraintName)
 /*
  * GetTableForeignConstraintOidsInternal takes in a relationOid, and returns
  * the list of OIDs for foreign constraints that the relation with relationOid
- * is involved according to "attributeNumber" argument. In that sense,
- * "attributeNumber" should be:
- *  - "Anum_pg_constraint_conrelid" to get the ones in which our relation is
- *    the "referencing" one, and
- *  - "Anum_pg_constraint_confrelid" to get the ones in which our relation is
+ * is involved according to "flags" argument. In that sense,
+ * "flags" should include either:
+ *  - "EXTRACT_REFERENCING_CONSTRAINTS" to get the ones in which our relation is
+ *    the "referencing" one, or
+ *  - "EXTRACT_REFERENCED_CONSTRAINTS" to get the ones in which our relation is
  *    the "referenced" one.
- * Note that since there is no index for the column Anum_pg_constraint_confrelid,
- * this function performs sequential scan on pg_constraint in that case.
- *
- * Self-referencing foreign keys will not be considered if excludeSelfReference
- * is true.
+ * Self-referencing foreign keys will not be considered if "flags" includes
+ * EXCLUDE_SELF_REFERENCES as well.
  */
 static List *
-GetTableForeignConstraintOidsInternal(Oid relationOid, AttrNumber attributeNumber,
-									  bool excludeSelfReference)
+GetTableForeignConstraintOidsInternal(Oid relationOid, int flags)
 {
-	Assert(attributeNumber == Anum_pg_constraint_conrelid ||
-		   attributeNumber == Anum_pg_constraint_confrelid);
+	AttrNumber attributeNumber = InvalidAttrNumber;
+
+	/* either of them should be passed */
+	Assert(flags & (EXTRACT_REFERENCING_CONSTRAINTS | EXTRACT_REFERENCED_CONSTRAINTS));
+
+	if (flags & EXTRACT_REFERENCING_CONSTRAINTS)
+	{
+		attributeNumber = Anum_pg_constraint_conrelid;
+
+		/* only one of them should be passed at a time */
+		Assert(!(flags & EXTRACT_REFERENCED_CONSTRAINTS));
+	}
+	else if (flags & EXTRACT_REFERENCED_CONSTRAINTS)
+	{
+		attributeNumber = Anum_pg_constraint_confrelid;
+	}
+
+	bool excludeSelfReference = (flags & EXCLUDE_SELF_REFERENCES);
 
 	List *foreignKeyOids = NIL;
 
 	ScanKeyData scanKey[1];
 	int scanKeyCount = 1;
+
+	/*
+	 * Note that since there is no index for the column Anum_pg_constraint_confrelid,
+	 * this function performs sequential scan on pg_constraint in that case.
+	 */
 	bool hasIndex = (attributeNumber == Anum_pg_constraint_conrelid) ? true : false;
 
 	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
@@ -734,6 +753,11 @@ GetTableForeignConstraintOidsInternal(Oid relationOid, AttrNumber attributeNumbe
 		bool inheritedConstraint = OidIsValid(constraintForm->conparentid);
 		if (inheritedConstraint)
 		{
+			/*
+			 * We only consider the constraints that are explicitly created on
+			 * the table as we already process the constraints from parent tables
+			 * implicitly when a command is issued
+			 */
 			heapTuple = systable_getnext(scanDescriptor);
 			continue;
 		}
@@ -753,6 +777,12 @@ GetTableForeignConstraintOidsInternal(Oid relationOid, AttrNumber attributeNumbe
 	}
 
 	systable_endscan(scanDescriptor);
+
+	/*
+	 * Do not release AccessShareLock yet to prevent modifications to be done
+	 * on pg_constraint to make sure that caller will process valid foreign key
+	 * constraints through the transaction.
+	 */
 	heap_close(pgConstraint, NoLock);
 
 	return foreignKeyOids;
