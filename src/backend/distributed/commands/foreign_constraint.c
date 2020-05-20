@@ -102,9 +102,6 @@ ErrorIfUnsupportedForeignConstraintExists(Relation relation, char referencingDis
 										  Var *referencingDistKey,
 										  uint32 referencingColocationId)
 {
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-
 	Oid referencingTableId = relation->rd_id;
 	bool referencingNotReplicated = true;
 	bool referencingIsCitus = IsCitusTable(referencingTableId);
@@ -120,17 +117,17 @@ ErrorIfUnsupportedForeignConstraintExists(Relation relation, char referencingDis
 		referencingNotReplicated = (ShardReplicationFactor == 1);
 	}
 
-	Relation pgConstraint = heap_open(ConstraintRelationId, AccessShareLock);
-	ScanKeyInit(&scanKey[0], Anum_pg_constraint_conrelid, BTEqualStrategyNumber, F_OIDEQ,
-				relation->rd_id);
-	SysScanDesc scanDescriptor = systable_beginscan(pgConstraint,
-													ConstraintRelidTypidNameIndexId,
-													true, NULL,
-													scanKeyCount, scanKey);
+	int flags = EXTRACT_REFERENCING_CONSTRAINTS;
+	List *foreignKeyOids = GetTableForeignConstraintOidsInternal(referencingTableId,
+																 flags);
 
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	while (HeapTupleIsValid(heapTuple))
+	Oid foreignKeyOid = InvalidOid;
+	foreach_oid(foreignKeyOid, foreignKeyOids)
 	{
+		HeapTuple heapTuple = SearchSysCache1(CONSTROID, ObjectIdGetDatum(foreignKeyOid));
+
+		Assert(HeapTupleIsValid(heapTuple));
+
 		Form_pg_constraint constraintForm = (Form_pg_constraint) GETSTRUCT(heapTuple);
 
 		int referencingAttrIndex = -1;
@@ -139,13 +136,6 @@ ErrorIfUnsupportedForeignConstraintExists(Relation relation, char referencingDis
 		Var *referencedDistKey = NULL;
 		int referencedAttrIndex = -1;
 		uint32 referencedColocationId = INVALID_COLOCATION_ID;
-
-		/* not a foreign key constraint, skip to next one */
-		if (constraintForm->contype != CONSTRAINT_FOREIGN)
-		{
-			heapTuple = systable_getnext(scanDescriptor);
-			continue;
-		}
 
 		Oid referencedTableId = constraintForm->confrelid;
 		bool referencedIsCitus = IsCitusTable(referencedTableId);
@@ -186,7 +176,7 @@ ErrorIfUnsupportedForeignConstraintExists(Relation relation, char referencingDis
 		 */
 		if (referencingIsReferenceTable && referencedIsReferenceTable)
 		{
-			heapTuple = systable_getnext(scanDescriptor);
+			ReleaseSysCache(heapTuple);
 			continue;
 		}
 
@@ -309,12 +299,8 @@ ErrorIfUnsupportedForeignConstraintExists(Relation relation, char referencingDis
 									"https://citusdata.com/about/contact_us.")));
 		}
 
-		heapTuple = systable_getnext(scanDescriptor);
+		ReleaseSysCache(heapTuple);
 	}
-
-	/* clean up scan and close system catalog */
-	systable_endscan(scanDescriptor);
-	heap_close(pgConstraint, AccessShareLock);
 }
 
 
