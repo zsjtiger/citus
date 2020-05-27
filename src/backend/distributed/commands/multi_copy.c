@@ -91,6 +91,7 @@
 #include "distributed/hash_helpers.h"
 #include "executor/executor.h"
 #include "foreign/foreign.h"
+#include "tcop/cmdtag.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "nodes/makefuncs.h"
@@ -206,8 +207,8 @@ typedef struct ShardConnections
 
 
 /* Local functions forward declarations */
-static void CopyToExistingShards(CopyStmt *copyStatement, char *completionTag);
-static void CopyToNewShards(CopyStmt *copyStatement, char *completionTag, Oid relationId);
+static void CopyToExistingShards(CopyStmt *copyStatement, QueryCompletionCompat *completionTag);
+static void CopyToNewShards(CopyStmt *copyStatement, QueryCompletionCompat *completionTag, Oid relationId);
 static void OpenCopyConnectionsForNewShards(CopyStmt *copyStatement,
 											ShardConnections *shardConnections, bool
 											stopOnFailure,
@@ -238,7 +239,7 @@ static FmgrInfo * TypeOutputFunctions(uint32 columnCount, Oid *typeIdArray,
 									  bool binaryFormat);
 static List * CopyGetAttnums(TupleDesc tupDesc, Relation rel, List *attnamelist);
 static bool CopyStatementHasFormat(CopyStmt *copyStatement, char *formatName);
-static void CitusCopyFrom(CopyStmt *copyStatement, char *completionTag);
+static void CitusCopyFrom(CopyStmt *copyStatement, QueryCompletionCompat *completionTag);
 static HTAB * CreateConnectionStateHash(MemoryContext memoryContext);
 static HTAB * CreateShardStateHash(MemoryContext memoryContext);
 static CopyConnectionState * GetConnectionState(HTAB *connectionStateHash,
@@ -265,7 +266,7 @@ static void UnclaimCopyConnections(List *connectionStateList);
 static void ShutdownCopyConnectionState(CopyConnectionState *connectionState,
 										CitusCopyDestReceiver *copyDest);
 static SelectStmt * CitusCopySelect(CopyStmt *copyStatement);
-static void CitusCopyTo(CopyStmt *copyStatement, char *completionTag);
+static void CitusCopyTo(CopyStmt *copyStatement, QueryCompletionCompat *completionTag);
 static int64 ForwardCopyDataFromConnection(CopyOutState copyOutState,
 										   MultiConnection *connection);
 
@@ -293,6 +294,7 @@ static bool CitusCopyDestReceiverReceive(TupleTableSlot *slot,
 static void CitusCopyDestReceiverShutdown(DestReceiver *destReceiver);
 static void CitusCopyDestReceiverDestroy(DestReceiver *destReceiver);
 static bool ContainsLocalPlacement(int64 shardId);
+static void CompleteCopyQueryTagCompat(QueryCompletionCompat* completionTag, uint64 processedRowCount);
 static void FinishLocalCopy(CitusCopyDestReceiver *copyDest);
 static void CloneCopyOutStateForLocalCopy(CopyOutState from, CopyOutState to);
 static bool ShouldExecuteCopyLocally(bool isIntermediateResult);
@@ -309,7 +311,7 @@ PG_FUNCTION_INFO_V1(citus_text_send_as_jsonb);
  * and the partition method of the distributed table.
  */
 static void
-CitusCopyFrom(CopyStmt *copyStatement, char *completionTag)
+CitusCopyFrom(CopyStmt *copyStatement, QueryCompletionCompat *completionTag)
 {
 	UseCoordinatedTransaction();
 
@@ -365,7 +367,7 @@ CitusCopyFrom(CopyStmt *copyStatement, char *completionTag)
  * rows.
  */
 static void
-CopyToExistingShards(CopyStmt *copyStatement, char *completionTag)
+CopyToExistingShards(CopyStmt *copyStatement, QueryCompletionCompat *completionTag)
 {
 	Oid tableId = RangeVarGetRelid(copyStatement->relation, NoLock, false);
 
@@ -534,8 +536,7 @@ CopyToExistingShards(CopyStmt *copyStatement, char *completionTag)
 
 	if (completionTag != NULL)
 	{
-		SafeSnprintf(completionTag, COMPLETION_TAG_BUFSIZE,
-					 "COPY " UINT64_FORMAT, processedRowCount);
+		CompleteCopyQueryTagCompat(completionTag, processedRowCount);
 	}
 }
 
@@ -545,7 +546,7 @@ CopyToExistingShards(CopyStmt *copyStatement, char *completionTag)
  * tables where we create new shards into which to copy rows.
  */
 static void
-CopyToNewShards(CopyStmt *copyStatement, char *completionTag, Oid relationId)
+CopyToNewShards(CopyStmt *copyStatement, QueryCompletionCompat *completionTag, Oid relationId)
 {
 	/* allocate column values and nulls arrays */
 	Relation distributedRelation = heap_open(relationId, RowExclusiveLock);
@@ -719,9 +720,17 @@ CopyToNewShards(CopyStmt *copyStatement, char *completionTag, Oid relationId)
 
 	if (completionTag != NULL)
 	{
-		SafeSnprintf(completionTag, COMPLETION_TAG_BUFSIZE,
-					 "COPY " UINT64_FORMAT, processedRowCount);
+		CompleteCopyQueryTagCompat(completionTag, processedRowCount);
 	}
+}
+
+static void CompleteCopyQueryTagCompat(QueryCompletionCompat* completionTag, uint64 processedRowCount) {
+	#if PG_VERSION_NUM >= PG_VERSION_13
+		SetQueryCompletion(completionTag, CMDTAG_COPY, processedRowCount);
+	#else
+		SafeSnprintf(completionTag, COMPLETION_TAG_BUFSIZE,
+				"COPY " UINT64_FORMAT, processedRowCount);
+	#endif
 }
 
 
@@ -2679,7 +2688,7 @@ CopyStatementHasFormat(CopyStmt *copyStatement, char *formatName)
  * further processing is needed.
  */
 Node *
-ProcessCopyStmt(CopyStmt *copyStatement, char *completionTag, const char *queryString)
+ProcessCopyStmt(CopyStmt *copyStatement, QueryCompletionCompat *completionTag, const char *queryString)
 {
 	/*
 	 * Handle special COPY "resultid" FROM STDIN WITH (format result) commands
@@ -2812,8 +2821,7 @@ ProcessCopyStmt(CopyStmt *copyStatement, char *completionTag, const char *queryS
 
 			int64 tuplesSent = WorkerExecuteSqlTask(query, filename, binaryCopyFormat);
 
-			SafeSnprintf(completionTag, COMPLETION_TAG_BUFSIZE,
-						 "COPY " UINT64_FORMAT, tuplesSent);
+			CompleteCopyQueryTagCompat(completionTag, tuplesSent);
 
 			return NULL;
 		}
@@ -2876,7 +2884,7 @@ CitusCopySelect(CopyStmt *copyStatement)
  * table dump.
  */
 static void
-CitusCopyTo(CopyStmt *copyStatement, char *completionTag)
+CitusCopyTo(CopyStmt *copyStatement, QueryCompletionCompat *completionTag)
 {
 	ListCell *shardIntervalCell = NULL;
 	int64 tuplesSent = 0;
@@ -2961,8 +2969,7 @@ CitusCopyTo(CopyStmt *copyStatement, char *completionTag)
 
 	if (completionTag != NULL)
 	{
-		SafeSnprintf(completionTag, COMPLETION_TAG_BUFSIZE, "COPY " UINT64_FORMAT,
-					 tuplesSent);
+		CompleteCopyQueryTagCompat(completionTag, tuplesSent);
 	}
 }
 
