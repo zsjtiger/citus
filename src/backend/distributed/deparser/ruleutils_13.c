@@ -154,12 +154,12 @@ typedef struct
  *
  * When deparsing plan trees, there is always just a single item in the
  * deparse_namespace list (since a plan tree never contains Vars with
- * varlevelsup > 0).  We store the PlanState node that is the immediate
+ * varlevelsup > 0).  We store the Plan node that is the immediate
  * parent of the expression to be deparsed, as well as a list of that
- * PlanState's ancestors.  In addition, we store its outer and inner subplan
+ * Plan's ancestors.  In addition, we store its outer and inner subplan
  * state nodes, as well as their plan nodes' targetlists, and the index tlist
  * if the current plan node might contain INDEX_VAR Vars.  (These fields could
- * be derived on-the-fly from the current PlanState, but it seems notationally
+ * be derived on-the-fly from the current Plan, but it seems notationally
  * clearer to set them up as separate fields.)
  */
 typedef struct
@@ -168,14 +168,15 @@ typedef struct
 	List	   *rtable_names;	/* Parallel list of names for RTEs */
 	List	   *rtable_columns; /* Parallel list of deparse_columns structs */
 	List	   *ctes;			/* List of CommonTableExpr nodes */
+	List  	   *subplans;
 	/* Workspace for column alias assignment: */
 	bool		unique_using;	/* Are we making USING names globally unique */
 	List	   *using_names;	/* List of assigned names for USING columns */
 	/* Remaining fields are used only when deparsing a Plan tree: */
-	PlanState  *planstate;		/* immediate parent of current expression */
-	List	   *ancestors;		/* ancestors of planstate */
-	PlanState  *outer_planstate;	/* outer subplan state, or NULL if none */
-	PlanState  *inner_planstate;	/* inner subplan state, or NULL if none */
+	Plan  *plan;		/* immediate parent of current expression */
+	List	   *ancestors;		/* ancestors of plan */
+	Plan  *outer_planstate;	/* outer subplan state, or NULL if none */
+	Plan  *inner_planstate;	/* inner subplan state, or NULL if none */
 	List	   *outer_tlist;	/* referent for OUTER_VAR Vars */
 	List	   *inner_tlist;	/* referent for INNER_VAR Vars */
 	List	   *index_tlist;	/* referent for INDEX_VAR Vars */
@@ -333,8 +334,8 @@ static void identify_join_columns(JoinExpr *j, RangeTblEntry *jrte,
 static void flatten_join_using_qual(Node *qual,
 						List **leftvars, List **rightvars);
 static char *get_rtable_name(int rtindex, deparse_context *context);
-static void set_deparse_planstate(deparse_namespace *dpns, PlanState *ps);
-static void push_child_plan(deparse_namespace *dpns, PlanState *ps,
+static void set_deparse_plan(deparse_namespace *dpns, Plan *ps);
+static void push_child_plan(deparse_namespace *dpns, Plan *ps,
 				deparse_namespace *save_dpns);
 static void pop_child_plan(deparse_namespace *dpns,
 			   deparse_namespace *save_dpns);
@@ -672,6 +673,7 @@ set_deparse_for_query(deparse_namespace *dpns, Query *query,
 	/* Initialize *dpns and fill rtable/ctes links */
 	memset(dpns, 0, sizeof(deparse_namespace));
 	dpns->rtable = query->rtable;
+	dpns->subplans = NIL;
 	dpns->ctes = query->cteList;
 
 	/* Assign a unique relation alias to each RTE */
@@ -1710,19 +1712,19 @@ get_rtable_name(int rtindex, deparse_context *context)
 }
 
 /*
- * set_deparse_planstate: set up deparse_namespace to parse subexpressions
- * of a given PlanState node
+ * set_deparse_plan: set up deparse_namespace to parse subexpressions
+ * of a given Plan node
  *
- * This sets the planstate, outer_planstate, inner_planstate, outer_tlist,
+ * This sets the plan, outer_planstate, inner_planstate, outer_tlist,
  * inner_tlist, and index_tlist fields.  Caller is responsible for adjusting
  * the ancestors list if necessary.  Note that the rtable and ctes fields do
  * not need to change when shifting attention to different plan nodes in a
  * single plan tree.
  */
 static void
-set_deparse_planstate(deparse_namespace *dpns, PlanState *ps)
+set_deparse_plan(deparse_namespace *dpns, Plan *ps)
 {
-	dpns->planstate = ps;
+	dpns->plan = ps;
 
 	/*
 	 * We special-case Append and MergeAppend to pretend that the first child
@@ -1732,17 +1734,17 @@ set_deparse_planstate(deparse_namespace *dpns, PlanState *ps)
 	 * first child plan is the OUTER referent; this is to support RETURNING
 	 * lists containing references to non-target relations.
 	 */
-	if (IsA(ps, AppendState))
-		dpns->outer_planstate = ((AppendState *) ps)->appendplans[0];
-	else if (IsA(ps, MergeAppendState))
-		dpns->outer_planstate = ((MergeAppendState *) ps)->mergeplans[0];
-	else if (IsA(ps, ModifyTableState))
-		dpns->outer_planstate = ((ModifyTableState *) ps)->mt_plans[0];
+	if (IsA(ps, Append))
+		dpns->outer_planstate = linitial(((Append *) ps)->appendplans);
+	else if (IsA(ps, MergeAppend))
+		dpns->outer_planstate = linitial(((MergeAppend *) ps)->mergeplans);
+	else if (IsA(ps, ModifyTable))
+		dpns->outer_planstate = linitial(((ModifyTable *) ps)->plans);
 	else
-		dpns->outer_planstate = outerPlanState(ps);
+		dpns->outer_planstate = outerPlan(ps);
 
 	if (dpns->outer_planstate)
-		dpns->outer_tlist = dpns->outer_planstate->plan->targetlist;
+		dpns->outer_tlist = dpns->outer_planstate->targetlist;
 	else
 		dpns->outer_tlist = NIL;
 
@@ -1755,29 +1757,29 @@ set_deparse_planstate(deparse_namespace *dpns, PlanState *ps)
 	 * to reuse OUTER, it's used for RETURNING in some modify table cases,
 	 * although not INSERT .. CONFLICT).
 	 */
-	if (IsA(ps, SubqueryScanState))
-		dpns->inner_planstate = ((SubqueryScanState *) ps)->subplan;
-	else if (IsA(ps, CteScanState))
-		dpns->inner_planstate = ((CteScanState *) ps)->cteplanstate;
-	else if (IsA(ps, ModifyTableState))
+	if (IsA(ps, SubqueryScan))
+		dpns->inner_planstate = ((SubqueryScan *) ps)->subplan;
+	else if (IsA(ps, CteScan))
+		dpns->inner_planstate = list_nth(dpns->subplans,((CteScan *) ps)->ctePlanId - 1);
+	else if (IsA(ps, ModifyTable))
 		dpns->inner_planstate = ps;
 	else
-		dpns->inner_planstate = innerPlanState(ps);
+		dpns->inner_planstate = innerPlan(ps);
 
-	if (IsA(ps, ModifyTableState))
-		dpns->inner_tlist = ((ModifyTableState *) ps)->mt_excludedtlist;
+	if (IsA(ps, ModifyTable))
+		dpns->inner_tlist = ((ModifyTable *) ps)->exclRelTlist;
 	else if (dpns->inner_planstate)
-		dpns->inner_tlist = dpns->inner_planstate->plan->targetlist;
+		dpns->inner_tlist = dpns->inner_planstate->targetlist;
 	else
 		dpns->inner_tlist = NIL;
 
 	/* Set up referent for INDEX_VAR Vars, if needed */
-	if (IsA(ps->plan, IndexOnlyScan))
-		dpns->index_tlist = ((IndexOnlyScan *) ps->plan)->indextlist;
-	else if (IsA(ps->plan, ForeignScan))
-		dpns->index_tlist = ((ForeignScan *) ps->plan)->fdw_scan_tlist;
-	else if (IsA(ps->plan, CustomScan))
-		dpns->index_tlist = ((CustomScan *) ps->plan)->custom_scan_tlist;
+	if (IsA(ps, IndexOnlyScan))
+		dpns->index_tlist = ((IndexOnlyScan *) ps)->indextlist;
+	else if (IsA(ps, ForeignScan))
+		dpns->index_tlist = ((ForeignScan *) ps)->fdw_scan_tlist;
+	else if (IsA(ps, CustomScan))
+		dpns->index_tlist = ((CustomScan *) ps)->custom_scan_tlist;
 	else
 		dpns->index_tlist = NIL;
 }
@@ -1795,17 +1797,17 @@ set_deparse_planstate(deparse_namespace *dpns, PlanState *ps)
  * previous state for pop_child_plan.
  */
 static void
-push_child_plan(deparse_namespace *dpns, PlanState *ps,
+push_child_plan(deparse_namespace *dpns, Plan *ps,
 				deparse_namespace *save_dpns)
 {
 	/* Save state for restoration later */
 	*save_dpns = *dpns;
 
 	/* Link current plan node into ancestors list */
-	dpns->ancestors = lcons(dpns->planstate, dpns->ancestors);
+	dpns->ancestors = lcons(dpns->plan, dpns->ancestors);
 
 	/* Set attention on selected child */
-	set_deparse_planstate(dpns, ps);
+	set_deparse_plan(dpns, ps);
 }
 
 /*
@@ -4285,22 +4287,22 @@ find_param_referent(Param *param, deparse_context *context,
 	/*
 	 * If it's a PARAM_EXEC parameter, look for a matching NestLoopParam or
 	 * SubPlan argument.  This will necessarily be in some ancestor of the
-	 * current expression's PlanState.
+	 * current expression's Plan.
 	 */
 	if (param->paramkind == PARAM_EXEC)
 	{
 		deparse_namespace *dpns;
-		PlanState  *child_ps;
+		Plan  *child_ps;
 		bool		in_same_plan_level;
 		ListCell   *lc;
 
 		dpns = (deparse_namespace *) linitial(context->namespaces);
-		child_ps = dpns->planstate;
+		child_ps = dpns->plan;
 		in_same_plan_level = true;
 
 		foreach(lc, dpns->ancestors)
 		{
-			PlanState  *ps = (PlanState *) lfirst(lc);
+			Node       *ancestor = (Node *) lfirst(lc);
 			ListCell   *lc2;
 
 			/*
@@ -4308,11 +4310,11 @@ find_param_referent(Param *param, deparse_context *context,
 			 * we've crawled up out of a subplan, this couldn't possibly be
 			 * the right match.
 			 */
-			if (IsA(ps, NestLoopState) &&
-				child_ps == innerPlanState(ps) &&
+			if (IsA(ancestor, NestLoop) &&
+				child_ps == innerPlan(ancestor) &&
 				in_same_plan_level)
 			{
-				NestLoop   *nl = (NestLoop *) ps->plan;
+				NestLoop   *nl = (NestLoop *) ancestor;
 
 				foreach(lc2, nl->nestParams)
 				{
@@ -4331,15 +4333,12 @@ find_param_referent(Param *param, deparse_context *context,
 			/*
 			 * Check to see if we're crawling up from a subplan.
 			 */
-			foreach(lc2, ps->subPlan)
+			if(IsA(ancestor, SubPlan))
 			{
-				SubPlanState *sstate = (SubPlanState *) lfirst(lc2);
-				SubPlan    *subplan = sstate->subplan;
+	
+				SubPlan    *subplan = (SubPlan*) ancestor;
 				ListCell   *lc3;
 				ListCell   *lc4;
-
-				if (child_ps != sstate->planstate)
-					continue;
 
 				/* Matched subplan, so check its arguments */
 				forboth(lc3, subplan->parParam, lc4, subplan->args)
@@ -4349,10 +4348,27 @@ find_param_referent(Param *param, deparse_context *context,
 
 					if (paramid == param->paramid)
 					{
-						/* Found a match, so return it */
-						*dpns_p = dpns;
-						*ancestor_cell_p = lc;
-						return arg;
+         				/*
+						* Found a match, so return it.  But, since Vars in
+						* the arg are to be evaluated in the surrounding
+						* context, we have to point to the next ancestor item
+						* that is *not* a SubPlan.
+						*/
+						ListCell   *rest;
+
+						for_each_cell(rest, dpns->ancestors,
+													lnext(dpns->ancestors, lc))
+						{
+								Node       *ancestor2 = (Node *) lfirst(rest);
+
+								if (!IsA(ancestor2, SubPlan))
+								{
+										*dpns_p = dpns;
+										*ancestor_cell_p = rest;
+										return arg;
+								}
+						}
+						elog(ERROR, "SubPlan cannot be outermost ancestor");
 					}
 				}
 
@@ -4367,15 +4383,15 @@ find_param_referent(Param *param, deparse_context *context,
 			 * list, but we need to know if we should reset
 			 * in_same_plan_level.
 			 */
-			foreach(lc2, ps->initPlan)
+			foreach(lc2, ((Plan *) ancestor)->initPlan)
 			{
-				SubPlanState *sstate = (SubPlanState *) lfirst(lc2);
+				SubPlan    *subplan = castNode(SubPlan, lfirst(lc2));
 
-				if (child_ps != sstate->planstate)
+				if (child_ps != (Plan *) list_nth(dpns->subplans,subplan->plan_id - 1))
 					continue;
 
 				/* No parameters to be had here. */
-				Assert(sstate->subplan->parParam == NIL);
+				Assert(subplan->parParam == NIL);
 
 				/* Keep looking, but we are emerging from an initplan. */
 				in_same_plan_level = false;
@@ -4383,7 +4399,7 @@ find_param_referent(Param *param, deparse_context *context,
 			}
 
 			/* No luck, crawl up to next ancestor */
-			child_ps = ps;
+			child_ps = (Plan *) ancestor;
 		}
 	}
 
