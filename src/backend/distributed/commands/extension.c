@@ -729,6 +729,7 @@ IsDropCitusStmt(Node *parseTree)
 	{
 		return false;
 	}
+	return true;
 
 	/* now that we have a DropStmt, check if citus is among the objects to dropped */
 	Value *objectName;
