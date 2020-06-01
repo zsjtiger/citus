@@ -729,11 +729,13 @@ IsDropCitusStmt(Node *parseTree)
 	{
 		return false;
 	}
-	return true;
-
+	DropStmt* dropStmt  = (DropStmt *) parseTree;
+	if (dropStmt->removeType != OBJECT_EXTENSION) {
+		return false;
+	}
 	/* now that we have a DropStmt, check if citus is among the objects to dropped */
 	Value *objectName;
-	foreach_ptr(objectName, ((DropStmt *) parseTree)->objects)
+	foreach_ptr(objectName, dropStmt->objects)
 	{
 		const char *extensionName = strVal(objectName);
 
