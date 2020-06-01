@@ -72,8 +72,20 @@ int ShardPlacementPolicy = SHARD_PLACEMENT_ROUND_ROBIN;
 int NextShardId = 0;
 int NextPlacementId = 0;
 
+/*
+ * ListCellAndListWrapper stores a list and list cell.
+ * This struct is used for functionContext. When iterating a list
+ * in separate function calls, we need both the list and the current cell.
+ * Therefore this wrapper stores both of them.
+ */
+typedef struct ListCellAndListWrapper {
+	List *list;
+	ListCell *listCell;
+} ListCellAndListWrapper;
+
 static List * GetTableReplicaIdentityCommand(Oid relationId);
 static Datum WorkerNodeGetDatum(WorkerNode *workerNode, TupleDesc tupleDescriptor);
+
 
 /* exports for SQL callable functions */
 PG_FUNCTION_INFO_V1(master_get_table_metadata);
@@ -221,8 +233,10 @@ master_get_table_ddl_events(PG_FUNCTION_ARGS)
 		/* allocate DDL statements, and then save position in DDL statements */
 		List *tableDDLEventList = GetTableDDLEvents(relationId, includeSequenceDefaults);
 		tableDDLEventCell = list_head(tableDDLEventList);
-
-		functionContext->user_fctx = tableDDLEventCell;
+		ListCellAndListWrapper* wrapper = palloc0(sizeof(ListCellAndListWrapper));
+		wrapper->list = tableDDLEventList;
+		wrapper->listCell = tableDDLEventCell;
+		functionContext->user_fctx = wrapper;
 
 		MemoryContextSwitchTo(oldContext);
 	}
@@ -235,13 +249,13 @@ master_get_table_ddl_events(PG_FUNCTION_ARGS)
 	 */
 	functionContext = SRF_PERCALL_SETUP();
 
-	tableDDLEventCell = (ListCell *) functionContext->user_fctx;
-	if (tableDDLEventCell != NULL)
+	ListCellAndListWrapper* wrapper = (ListCellAndListWrapper *) functionContext->user_fctx;
+	if (wrapper->listCell != NULL)
 	{
-		char *ddlStatement = (char *) lfirst(tableDDLEventCell);
+		char *ddlStatement = (char *) lfirst(wrapper->listCell);
 		text *ddlStatementText = cstring_to_text(ddlStatement);
 
-		functionContext->user_fctx = lnext_compat(functionContext->user_fctx, tableDDLEventCell);
+		wrapper->listCell = lnext_compat(wrapper->list, wrapper->listCell);
 
 		SRF_RETURN_NEXT(functionContext, PointerGetDatum(ddlStatementText));
 	}
