@@ -367,6 +367,7 @@ static void get_delete_query_def(Query *query, deparse_context *context);
 static void get_utility_query_def(Query *query, deparse_context *context);
 static void get_basic_select_query(Query *query, deparse_context *context,
 					   TupleDesc resultDesc);
+static void flatten_join_using_qual(Node *qual, List **leftvars, List **rightvars);
 static void get_target_list(List *targetList, deparse_context *context,
 				TupleDesc resultDesc);
 static void get_setop_query(Node *setOp, Query *query,
@@ -1568,26 +1569,139 @@ identify_join_columns(JoinExpr *j, RangeTblEntry *jrte,
 	 * joinleftcols, but while scanning joinrightcols we must distinguish
 	 * merged from unmerged columns.
 	 */
-	jcolno = 0;
-	foreach(lc, jrte->joinleftcols)
+	/* Scan the joinaliasvars list to identify simple column references */
+	int i = 0;
+	foreach(lc, jrte->joinaliasvars)
 	{
-		int			leftattno = lfirst_int(lc);
+		Var		   *aliasvar = (Var *) lfirst(lc);
 
-		colinfo->leftattnos[jcolno++] = leftattno;
-	}
-	rcolno = 0;
-	foreach(lc, jrte->joinrightcols)
-	{
-		int			rightattno = lfirst_int(lc);
+		/* get rid of any implicit coercion above the Var */
+		aliasvar = (Var *) strip_implicit_coercions((Node *) aliasvar);
 
-		if (rcolno < jrte->joinmergedcols)	/* merged column? */
-			colinfo->rightattnos[rcolno] = rightattno;
+		if (aliasvar == NULL)
+		{
+			/* It's a dropped column; nothing to do here */
+		}
+		else if (IsA(aliasvar, Var))
+		{
+			Assert(aliasvar->varlevelsup == 0);
+			Assert(aliasvar->varattno != 0);
+			if (aliasvar->varnosyn == colinfo->leftrti)
+				colinfo->leftattnos[i] = aliasvar->varattnosyn;
+			else if (aliasvar->varnosyn == colinfo->rightrti)
+				colinfo->rightattnos[i] = aliasvar->varattnosyn;
+			else
+				elog(ERROR, "unexpected varno %d in JOIN RTE",
+					 aliasvar->varno);
+		}
+		else if (IsA(aliasvar, CoalesceExpr))
+		{
+			/*
+			 * It's a merged column in FULL JOIN USING.  Ignore it for now and
+			 * let the code below identify the merged columns.
+			 */
+		}
 		else
-			colinfo->rightattnos[jcolno++] = rightattno;
-		rcolno++;
+			elog(ERROR, "unrecognized node type in join alias vars: %d",
+				 (int) nodeTag(aliasvar));
+
+		i++;
 	}
-	Assert(jcolno == numjoincols);
+	if (j->usingClause)
+	{
+		List	   *leftvars = NIL;
+		List	   *rightvars = NIL;
+		ListCell   *lc2;
+
+		/* Extract left- and right-side Vars from the qual expression */
+		flatten_join_using_qual(j->quals, &leftvars, &rightvars);
+		Assert(list_length(leftvars) == list_length(j->usingClause));
+		Assert(list_length(rightvars) == list_length(j->usingClause));
+
+		/* Mark the output columns accordingly */
+		i = 0;
+		forboth(lc, leftvars, lc2, rightvars)
+		{
+			Var		   *leftvar = (Var *) lfirst(lc);
+			Var		   *rightvar = (Var *) lfirst(lc2);
+
+			Assert(leftvar->varlevelsup == 0);
+			Assert(leftvar->varattno != 0);
+			if (leftvar->varnosyn != colinfo->leftrti)
+				elog(ERROR, "unexpected varno %d in JOIN USING qual",
+					 leftvar->varno);
+			colinfo->leftattnos[i] = leftvar->varattnosyn;
+
+			Assert(rightvar->varlevelsup == 0);
+			Assert(rightvar->varattno != 0);
+			if (rightvar->varnosyn != colinfo->rightrti)
+				elog(ERROR, "unexpected varno %d in JOIN USING qual",
+					 rightvar->varno);
+			colinfo->rightattnos[i] = rightvar->varattnosyn;
+
+			i++;
+		}
+	}
 }
+
+/*
+ * flatten_join_using_qual: extract Vars being joined from a JOIN/USING qual
+ *
+ * We assume that transformJoinUsingClause won't have produced anything except
+ * AND nodes, equality operator nodes, and possibly implicit coercions, and
+ * that the AND node inputs match left-to-right with the original USING list.
+ *
+ * Caller must initialize the result lists to NIL.
+ */
+static void
+flatten_join_using_qual(Node *qual, List **leftvars, List **rightvars)
+{
+	if (IsA(qual, BoolExpr))
+	{
+		/* Handle AND nodes by recursion */
+		BoolExpr   *b = (BoolExpr *) qual;
+		ListCell   *lc;
+
+		Assert(b->boolop == AND_EXPR);
+		foreach(lc, b->args)
+		{
+			flatten_join_using_qual((Node *) lfirst(lc),
+									leftvars, rightvars);
+		}
+	}
+	else if (IsA(qual, OpExpr))
+	{
+		/* Otherwise we should have an equality operator */
+		OpExpr	   *op = (OpExpr *) qual;
+		Var		   *var;
+
+		if (list_length(op->args) != 2)
+			elog(ERROR, "unexpected unary operator in JOIN/USING qual");
+		/* Arguments should be Vars with perhaps implicit coercions */
+		var = (Var *) strip_implicit_coercions((Node *) linitial(op->args));
+		if (!IsA(var, Var))
+			elog(ERROR, "unexpected node type in JOIN/USING qual: %d",
+				 (int) nodeTag(var));
+		*leftvars = lappend(*leftvars, var);
+		var = (Var *) strip_implicit_coercions((Node *) lsecond(op->args));
+		if (!IsA(var, Var))
+			elog(ERROR, "unexpected node type in JOIN/USING qual: %d",
+				 (int) nodeTag(var));
+		*rightvars = lappend(*rightvars, var);
+	}
+	else
+	{
+		/* Perhaps we have an implicit coercion to boolean? */
+		Node	   *q = strip_implicit_coercions(qual);
+
+		if (q != qual)
+			flatten_join_using_qual(q, leftvars, rightvars);
+		else
+			elog(ERROR, "unexpected node type in JOIN/USING qual: %d",
+				 (int) nodeTag(qual));
+	}
+}
+
 
 /*
  * get_rtable_name: convenience function to get a previously assigned RTE alias
