@@ -8,7 +8,6 @@ SET citus.next_shard_id TO 1580000;
 SET citus.shard_replication_factor TO 1;
 SET citus.replication_model TO 'streaming';
 CREATE TABLE table_1 (key int, value text);
-DEBUG:  building index "pg_toast_xxxxx_index" on table "pg_toast_xxxxx" serially
 SELECT create_distributed_table('table_1', 'key');
  create_distributed_table
 ---------------------------------------------------------------------
@@ -16,7 +15,6 @@ SELECT create_distributed_table('table_1', 'key');
 (1 row)
 
 CREATE TABLE table_2 (key int, value text);
-DEBUG:  building index "pg_toast_xxxxx_index" on table "pg_toast_xxxxx" serially
 SELECT create_distributed_table('table_2', 'key');
  create_distributed_table
 ---------------------------------------------------------------------
@@ -24,7 +22,6 @@ SELECT create_distributed_table('table_2', 'key');
 (1 row)
 
 CREATE TABLE ref_table (key int, value text);
-DEBUG:  building index "pg_toast_xxxxx_index" on table "pg_toast_xxxxx" serially
 SELECT create_reference_table('ref_table');
  create_reference_table
 ---------------------------------------------------------------------
