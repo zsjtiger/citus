@@ -22,6 +22,17 @@
 
 
 /*
+ * ListCellAndListWrapper stores a list and list cell.
+ * This struct is used for functionContext. When iterating a list
+ * in separate function calls, we need both the list and the current cell.
+ * Therefore this wrapper stores both of them.
+ */
+typedef struct ListCellAndListWrapper {
+	List *list;
+	ListCell *listCell;
+} ListCellAndListWrapper;
+
+/*
  * foreach_ptr -
  *	  a convenience macro which loops through a pointer list without needing a
  *	  ListCell, just a declared pointer variable to store the pointer of the

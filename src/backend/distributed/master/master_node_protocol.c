@@ -72,17 +72,6 @@ int ShardPlacementPolicy = SHARD_PLACEMENT_ROUND_ROBIN;
 int NextShardId = 0;
 int NextPlacementId = 0;
 
-/*
- * ListCellAndListWrapper stores a list and list cell.
- * This struct is used for functionContext. When iterating a list
- * in separate function calls, we need both the list and the current cell.
- * Therefore this wrapper stores both of them.
- */
-typedef struct ListCellAndListWrapper {
-	List *list;
-	ListCell *listCell;
-} ListCellAndListWrapper;
-
 static List * GetTableReplicaIdentityCommand(Oid relationId);
 static Datum WorkerNodeGetDatum(WorkerNode *workerNode, TupleDesc tupleDescriptor);
 
