@@ -88,8 +88,6 @@ static bool ContainsRecurringRTE(RangeTblEntry *rangeTableEntry,
 static bool ContainsRecurringRangeTable(List *rangeTable, RecurringTuplesType *recurType);
 static bool HasRecurringTuples(Node *node, RecurringTuplesType *recurType);
 static MultiNode * SubqueryPushdownMultiNodeTree(Query *queryTree);
-static List * FlattenJoinVars(List *columnList, Query *queryTree);
-static Node * FlattenJoinVarsMutator(Node *node, Query *queryTree);
 static void UpdateVarMappingsForExtendedOpNode(List *columnList,
 											   List *flattenedColumnList,
 											   List *subqueryTargetEntryList);
@@ -1585,16 +1583,14 @@ SubqueryPushdownMultiNodeTree(Query *originalQuery)
 	List *havingClauseColumnList = pull_var_clause_default(queryTree->havingQual);
 	List *columnList = list_concat(targetColumnList, havingClauseColumnList);
 
-	List *flattenedExprList = FlattenJoinVars(columnList, queryTree);
-
 	/* create a target entry for each unique column */
-	List *subqueryTargetEntryList = CreateSubqueryTargetEntryList(flattenedExprList);
+	List *subqueryTargetEntryList = CreateSubqueryTargetEntryList(columnList);
 
 	/*
 	 * Update varno/varattno fields of columns in columnList to
 	 * point to corresponding target entry in subquery target entry list.
 	 */
-	UpdateVarMappingsForExtendedOpNode(columnList, flattenedExprList,
+	UpdateVarMappingsForExtendedOpNode(columnList, columnList,
 									   subqueryTargetEntryList);
 
 	/* new query only has target entries, join tree, and rtable*/
@@ -1674,98 +1670,6 @@ SubqueryPushdownMultiNodeTree(Query *originalQuery)
 	currentTopNode = (MultiNode *) extendedOpNode;
 
 	return currentTopNode;
-}
-
-
-/*
- * FlattenJoinVars iterates over provided columnList to identify
- * Var's that are referenced from join RTE, and reverts back to their
- * original RTEs. Then, returns a new list with reverted types. Note that,
- * length of the original list and created list must be equal.
- *
- * This is required because Postgres allows columns to be referenced using
- * a join alias. Therefore the same column from a table could be referenced
- * twice using its absolute table name (t1.a), and without table name (a).
- * This is a problem when one of them is inside the group by clause and the
- * other is not. Postgres is smart about it to detect that both target columns
- * resolve to the same thing, and allows a single group by clause to cover
- * both target entries when standard planner is called. Since we operate on
- * the original query, we want to make sure we provide correct varno/varattno
- * values to Postgres so that it could produce valid query.
- *
- * Only exception is that, if a join is given an alias name, we do not want to
- * flatten those var's. If we do, deparsing fails since it expects to see a join
- * alias, and cannot access the RTE in the join tree by their names.
- *
- * Also note that in case of full outer joins, a column could be flattened to a
- * coalesce expression if the column appears in the USING clause.
- */
-static List *
-FlattenJoinVars(List *columnList, Query *queryTree)
-{
-	List *flattenedExprList = NIL;
-
-	ListCell *columnCell = NULL;
-	foreach(columnCell, columnList)
-	{
-		Node *column = strip_implicit_coercions(
-			FlattenJoinVarsMutator((Node *) lfirst(columnCell), queryTree));
-		flattenedExprList = lappend(flattenedExprList, copyObject(column));
-	}
-
-	return flattenedExprList;
-}
-
-
-/*
- * FlattenJoinVarsMutator flattens a single column var as outlined in the caller
- * function (FlattenJoinVars). It iterates the join tree to find the
- * lowest Var it can go. This is usually the relation range table var. However
- * if a join operation is given an alias, iteration stops at that level since the
- * query can not reference the inner RTE by name if the join is given an alias.
- */
-static Node *
-FlattenJoinVarsMutator(Node *node, Query *queryTree)
-{
-	if (node == NULL)
-	{
-		return NULL;
-	}
-
-	if (IsA(node, Var))
-	{
-		Var *column = (Var *) node;
-		RangeTblEntry *rte = rt_fetch(column->varno, queryTree->rtable);
-		if (rte->rtekind == RTE_JOIN)
-		{
-			/*
-			 * if join has an alias, it is copied over join RTE. We should
-			 * reference this RTE.
-			 */
-			if (rte->alias != NULL)
-			{
-				return (Node *) column;
-			}
-
-			/* join RTE does not have an alias defined at this level, deeper look is needed */
-			Assert(column->varattno > 0);
-			Node *newColumn = (Node *) list_nth(rte->joinaliasvars, column->varattno - 1);
-			Assert(newColumn != NULL);
-
-			/*
-			 * Ideally we should use expression_tree_mutator here. But it does not call
-			 * mutate function for Vars, thus we make a recursive call to make sure
-			 * not to miss Vars in nested joins.
-			 */
-			return FlattenJoinVarsMutator(newColumn, queryTree);
-		}
-		else
-		{
-			return node;
-		}
-	}
-
-	return expression_tree_mutator(node, FlattenJoinVarsMutator, (void *) queryTree);
 }
 
 
