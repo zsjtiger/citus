@@ -9,6 +9,8 @@
 
 SET citus.next_shard_id TO 360000;
 
+SELECT * FROM pg_available_extensions();
+
 CREATE TABLE lineitem (
 	l_orderkey bigint not null,
 	l_partkey integer not null,
