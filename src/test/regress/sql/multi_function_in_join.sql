@@ -29,10 +29,10 @@ CREATE SEQUENCE numbers;
 SELECT * FROM table1 JOIN nextval('numbers') n ON (id = n) ORDER BY id ASC;
 
 -- Check joins of a function that returns a single integer
-CREATE FUNCTION add(integer, integer) RETURNS integer
-AS 'SELECT $1 + $2;'
-LANGUAGE SQL;
-SELECT * FROM table1 JOIN add(3,5) sum ON (id = sum) ORDER BY id ASC;
+-- CREATE FUNCTION add(integer, integer) RETURNS integer
+-- AS 'SELECT $1 + $2;'
+-- LANGUAGE SQL;
+-- SELECT * FROM table1 JOIN add(3,5) sum ON (id = sum) ORDER BY id ASC;
 
 -- Check join of plpgsql functions
 -- a function returning a single integer
