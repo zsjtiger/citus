@@ -182,11 +182,11 @@ typedef struct CitusCustomScanPath
 } CitusCustomScanPath;
 
 
-extern PlannedStmt * distributed_planner(
-	Query *parse,
-	#if PG_VERSION_NUM >= PG_VERSION_13
+extern PlannedStmt *distributed_planner(
+	Query * parse,
+#if PG_VERSION_NUM >= PG_VERSION_13
 	const char *query_string,
-	#endif 
+#endif
 	int cursorOptions,
 	ParamListInfo boundParams);
 extern List * ExtractRangeTableEntryList(Query *query);

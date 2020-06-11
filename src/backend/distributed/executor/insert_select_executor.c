@@ -170,7 +170,7 @@ CoordinatorInsertSelectExecScanInternal(CustomScanState *node)
 		/* plan the subquery, this may be another distributed query */
 		int cursorOptions = CURSOR_OPT_PARALLEL_OK;
 		PlannedStmt *selectPlan = pg_plan_query_compat(selectQuery, NULL, cursorOptions,
-												paramListInfo);
+													   paramListInfo);
 
 		/*
 		 * If we are dealing with partitioned table, we also need to lock its
@@ -443,8 +443,10 @@ WrapSubquery(Query *subquery)
 
 	/* create range table entries */
 	Alias *selectAlias = makeAlias("citus_insert_select_subquery", NIL);
-	RangeTblEntry *newRangeTableEntry = RangeTableEntryFromNSItem(addRangeTableEntryForSubquery(
-		pstate, subquery, selectAlias, false, true));
+	RangeTblEntry *newRangeTableEntry = RangeTableEntryFromNSItem(
+		addRangeTableEntryForSubquery(
+			pstate, subquery,
+			selectAlias, false, true));
 	outerQuery->rtable = list_make1(newRangeTableEntry);
 
 	/* set the FROM expression to the subquery */

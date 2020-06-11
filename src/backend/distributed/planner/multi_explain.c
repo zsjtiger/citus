@@ -160,7 +160,8 @@ CoordinatorInsertSelectExplainScan(CustomScanState *node, List *ancestors,
 	 * stages of EXPLAIN require it.
 	 */
 	Query *queryCopy = copyObject(query);
-	PlannedStmt *selectPlan = pg_plan_query_compat(queryCopy, NULL, cursorOptions, params);
+	PlannedStmt *selectPlan = pg_plan_query_compat(queryCopy, NULL, cursorOptions,
+												   params);
 	if (IsRedistributablePlan(selectPlan->planTree) &&
 		IsSupportedRedistributionTarget(targetRelationId))
 	{
@@ -214,7 +215,8 @@ ExplainSubPlans(DistributedPlan *distributedPlan, ExplainState *es)
 
 		INSTR_TIME_SET_ZERO(planduration);
 
-		ExplainOnePlanCompat(plan, into, es, queryString, params, NULL, &planduration, NULL);
+		ExplainOnePlanCompat(plan, into, es, queryString, params, NULL, &planduration,
+							 NULL);
 
 		if (es->format == EXPLAIN_FORMAT_TEXT)
 		{

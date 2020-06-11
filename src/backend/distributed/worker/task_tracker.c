@@ -52,7 +52,7 @@
 #include "storage/proc.h"
 #include "storage/shmem.h"
 #include "utils/guc.h"
-#if PG_VERSION_NUM >= PG_VERSION_13 
+#if PG_VERSION_NUM >= PG_VERSION_13
 #include "common/hashfn.h"
 #endif
 #include "utils/memutils.h"

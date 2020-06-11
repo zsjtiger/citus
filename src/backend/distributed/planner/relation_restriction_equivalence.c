@@ -277,8 +277,8 @@ SafeToPushdownUnionSubquery(PlannerRestrictionContext *plannerRestrictionContext
 		if (appendRelList != NULL)
 		{
 			#if PG_VERSION_NUM >= PG_VERSION_13
-				continue;
-			#endif	
+			continue;
+			#endif
 			varToBeAdded = FindTranslatedVar(appendRelList,
 											 relationRestriction->relationId,
 											 relationRestriction->index,
@@ -1351,6 +1351,7 @@ AddUnionAllSetOperationsToAttributeEquivalenceClass(AttributeEquivalenceClass **
 			continue;
 		}
 		int rtoffset = RangeTableOffsetCompat(root, appendRelInfo);
+
 		/* set the varno accordingly for this specific child */
 		varToBeAdded->varno = appendRelInfo->child_relid - rtoffset;
 
@@ -1359,23 +1360,28 @@ AddUnionAllSetOperationsToAttributeEquivalenceClass(AttributeEquivalenceClass **
 	}
 }
 
+
 /*
  * RangeTableOffsetCompat returns the range table offset(in glob->finalrtable) for the appendRelInfo.
  * For PG < 13 this is a no op.
  */
-static int RangeTableOffsetCompat(PlannerInfo *root, AppendRelInfo *appendRelInfo) {
+static int
+RangeTableOffsetCompat(PlannerInfo *root, AppendRelInfo *appendRelInfo)
+{
 	#if PG_VERSION_NUM >= PG_VERSION_13
 	int i = 1;
-	for (i = 1 ; i < root->simple_rel_array_size; i++) {
-		RangeTblEntry* rte = root->simple_rte_array[i];
-		if (rte->inh) {
+	for (i = 1; i < root->simple_rel_array_size; i++)
+	{
+		RangeTblEntry *rte = root->simple_rte_array[i];
+		if (rte->inh)
+		{
 			break;
 		}
 	}
-	int indexInRtable = (i-1);
+	int indexInRtable = (i - 1);
 	int rtoffset = appendRelInfo->parent_relid - 1 - (indexInRtable);
 	#else
-	int	rtoffset = 0;
+	int rtoffset = 0;
 	#endif
 	return rtoffset;
 }

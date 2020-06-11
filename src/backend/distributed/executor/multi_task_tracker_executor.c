@@ -50,7 +50,7 @@
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
 
-#if PG_VERSION_NUM >= PG_VERSION_13 
+#if PG_VERSION_NUM >= PG_VERSION_13
 #include "common/hashfn.h"
 #endif
 

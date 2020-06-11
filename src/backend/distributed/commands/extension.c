@@ -729,10 +729,12 @@ IsDropCitusStmt(Node *parseTree)
 	{
 		return false;
 	}
-	DropStmt* dropStmt  = (DropStmt *) parseTree;
-	if (dropStmt->removeType != OBJECT_EXTENSION) {
+	DropStmt *dropStmt = (DropStmt *) parseTree;
+	if (dropStmt->removeType != OBJECT_EXTENSION)
+	{
 		return false;
 	}
+
 	/* now that we have a DropStmt, check if citus is among the objects to dropped */
 	Value *objectName;
 	foreach_ptr(objectName, dropStmt->objects)

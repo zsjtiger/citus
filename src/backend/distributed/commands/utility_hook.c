@@ -88,8 +88,7 @@ static bool IsDropSchemaOrDB(Node *parsetree);
 void
 CitusProcessUtility(Node *node, const char *queryString, ProcessUtilityContext context,
 					ParamListInfo params, DestReceiver *dest,
-					QueryCompletionCompat *completionTag
-					)
+					QueryCompletionCompat *completionTag)
 {
 	PlannedStmt *plannedStmt = makeNode(PlannedStmt);
 	plannedStmt->commandType = CMD_UTILITY;
@@ -116,8 +115,7 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 					 ParamListInfo params,
 					 struct QueryEnvironment *queryEnv,
 					 DestReceiver *dest,
-					 QueryCompletionCompat *completionTag
-					 )
+					 QueryCompletionCompat *completionTag)
 {
 	Node *parsetree = pstmt->utilityStmt;
 	List *ddlJobs = NIL;
