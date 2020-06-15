@@ -701,7 +701,7 @@ RemoveIntermediateResultsDirectory(void)
 {
 	if (CreatedResultsDirectory)
 	{
-		PathNameDeleteTemporaryDir(IntermediateResultsDirectory());
+		CitusRemoveDirectory(IntermediateResultsDirectory());
 
 		CreatedResultsDirectory = false;
 	}
