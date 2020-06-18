@@ -3434,6 +3434,7 @@ InvalidateForeignKeyGraph(void)
 static void
 InvalidateDistRelationCacheCallback(Datum argument, Oid relationId)
 {
+	static int totalExpired = 0;
 	/* invalidate either entire cache or a specific entry */
 	if (relationId == InvalidOid)
 	{
@@ -3451,7 +3452,8 @@ InvalidateDistRelationCacheCallback(Datum argument, Oid relationId)
 		if (foundInCache)
 		{
 			cacheSlot->data->isValid = false;
-
+			char * relname = get_rel_name(relationId);
+			ereport(WARNING, (errmsg("InvalidateDistRelationCacheCallback cache expired for %s, total expired: %d", relname, totalExpired++)));
 			MemoryContext oldContext = MemoryContextSwitchTo(MetadataCacheMemoryContext);
 			DistTableCacheExpired = lappend(DistTableCacheExpired, cacheSlot->data);
 			MemoryContextSwitchTo(oldContext);
@@ -3481,6 +3483,7 @@ InvalidateDistRelationCacheCallback(Datum argument, Oid relationId)
 static void
 InvalidateDistTableCache(void)
 {
+	static int totalExpired = 0;
 	CitusTableCacheEntrySlot *cacheSlot = NULL;
 	HASH_SEQ_STATUS status;
 
@@ -3494,6 +3497,8 @@ InvalidateDistTableCache(void)
 		Assert(removedSlot == cacheSlot);
 
 		cacheSlot->data->isValid = false;
+		char * relname = get_rel_name(cacheSlot->relationId);
+		ereport(WARNING, (errmsg("InvalidateDistTableCache cache expired for %s, total expired: %d", relname, totalExpired++)));
 		MemoryContext oldContext = MemoryContextSwitchTo(MetadataCacheMemoryContext);
 		DistTableCacheExpired = lappend(DistTableCacheExpired, cacheSlot->data);
 		MemoryContextSwitchTo(oldContext);
