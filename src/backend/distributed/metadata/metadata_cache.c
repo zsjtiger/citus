@@ -254,6 +254,7 @@ static Oid LookupEnumValueId(Oid typeId, char *valueName);
 static void InvalidateCitusTableCacheEntrySlot(CitusTableCacheEntrySlot *cacheSlot);
 static void InvalidateDistTableCache(void);
 static void InvalidateDistObjectCache(void);
+static int HashSize(void);
 
 
 /* exports for SQL callable functions */
@@ -706,6 +707,18 @@ ShardPlacementList(uint64 shardId)
 	return placementList;
 }
 
+
+static int HashSize() {
+	HASH_SEQ_STATUS status;
+	CitusTableCacheEntrySlot *entry;
+
+	hash_seq_init(&status, DistTableCacheHash);
+	int size = 0;
+	while ((entry = (CitusTableCacheEntrySlot *) hash_seq_search(&status)) != 0) {
+			size++;
+	}
+	return size;
+} 
 
 /*
  * LookupShardCacheEntry returns the cache entry belonging to a shard, or
@@ -3339,9 +3352,9 @@ ResetCitusTableCacheEntry(CitusTableCacheEntry *cacheEntry)
 			pfree(placementArray);
 		}
 
-		bool foundInCache = false;
-		hash_search(DistTableCacheHash, &shardInterval->shardId, HASH_REMOVE,	
-					&foundInCache);
+		// bool foundInCache = false;
+		// hash_search(DistTableCacheHash, &shardInterval->shardId, HASH_REMOVE,	
+					// &foundInCache);
 
 		/* delete data pointed to by ShardInterval */
 		if (!valueByVal)
@@ -3486,6 +3499,8 @@ InvalidateDistRelationCacheCallback(Datum argument, Oid relationId)
 			hash_search(DistTableCacheHash, hashKey, HASH_FIND, &foundInCache);
 		if (foundInCache)
 		{
+			int size = HashSize();
+			ereport(WARNING, (errmsg("DistTableCacheHash size is %d", size)));
 			InvalidateCitusTableCacheEntrySlot(cacheSlot);
 		}
 
