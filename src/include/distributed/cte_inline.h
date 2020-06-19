@@ -17,5 +17,6 @@ extern bool EnableCTEInlining;
 
 extern void RecursivelyInlineCtesInQueryTree(Query *query);
 extern bool QueryTreeContainsInlinableCTE(Query *queryTree);
+extern void InlineCTEsInQueryTree(Query *query);
 
 #endif /* CTE_INLINE_H */

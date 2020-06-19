@@ -263,14 +263,35 @@ GenerateSubplansForSubqueriesAndCTEs(uint64 planId, Query *originalQuery,
  * If recursive planning results in an error then the error is returned. Otherwise, the
  * subplans will be added to subPlanList.
  */
+#include "distributed/cte_inline.h"
 static DeferredErrorMessage *
 RecursivelyPlanSubqueriesAndCTEs(Query *query, RecursivePlanningContext *context)
 {
-	DeferredErrorMessage *error = RecursivelyPlanCTEs(query, context);
-	if (error != NULL)
+	Query *inputQuery = copyObject(query);
+
+	InlineCTEsInQueryTree(inputQuery);
+	DeferredErrorMessage *e = DeferErrorIfQueryNotSupported(inputQuery);
+	if (e != NULL)
 	{
-		return error;
+		elog(DEBUG5, "%s", e->message );
+
+		StringInfo subPlanString = makeStringInfo();
+		pg_get_query_def(inputQuery, subPlanString);
+		ereport(DEBUG5, (errmsg("subPlanString: %s",
+								(subPlanString->data))));
+
+		DeferredErrorMessage *error = RecursivelyPlanCTEs(query, context);
+		if (error != NULL)
+		{
+			return error;
+		}
 	}
+	else
+	{
+		InlineCTEsInQueryTree(query);
+
+	}
+
 
 	if (SubqueryPushdown)
 	{
