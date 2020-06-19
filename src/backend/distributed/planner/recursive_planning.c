@@ -186,6 +186,7 @@ static Query * BuildReadIntermediateResultsQuery(List *targetEntryList,
 												 Const *resultIdConst, Oid functionOid,
 												 bool useBinaryCopyFormat);
 
+
 /*
  * GenerateSubplansForSubqueriesAndCTEs is a wrapper around RecursivelyPlanSubqueriesAndCTEs.
  * The function returns the subplans if necessary. For the details of when/how subplans are
@@ -267,31 +268,11 @@ GenerateSubplansForSubqueriesAndCTEs(uint64 planId, Query *originalQuery,
 static DeferredErrorMessage *
 RecursivelyPlanSubqueriesAndCTEs(Query *query, RecursivePlanningContext *context)
 {
-	Query *inputQuery = copyObject(query);
-
-	InlineCTEsInQueryTree(inputQuery);
-	DeferredErrorMessage *e = DeferErrorIfQueryNotSupported(inputQuery);
-	if (e != NULL)
+	DeferredErrorMessage *error = RecursivelyPlanCTEs(query, context);
+	if (error != NULL)
 	{
-		elog(DEBUG5, "%s", e->message );
-
-		StringInfo subPlanString = makeStringInfo();
-		pg_get_query_def(inputQuery, subPlanString);
-		ereport(DEBUG5, (errmsg("subPlanString: %s",
-								(subPlanString->data))));
-
-		DeferredErrorMessage *error = RecursivelyPlanCTEs(query, context);
-		if (error != NULL)
-		{
-			return error;
-		}
+		return error;
 	}
-	else
-	{
-		InlineCTEsInQueryTree(query);
-
-	}
-
 
 	if (SubqueryPushdown)
 	{

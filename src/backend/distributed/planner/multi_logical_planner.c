@@ -161,6 +161,9 @@ MultiLogicalPlanCreate(Query *originalQuery, Query *queryTree,
 		multiQueryNode = MultiNodeTree(queryTree);
 	}
 
+	if (multiQueryNode == NULL)
+		return NULL;
+
 	/* add a root node to serve as the permanent handle to the tree */
 	MultiTreeRoot *rootNode = CitusMakeNode(MultiTreeRoot);
 	SetChild((MultiUnaryNode *) rootNode, multiQueryNode);
@@ -671,7 +674,8 @@ MultiNodeTree(Query *queryTree)
 		queryTree);
 	if (unsupportedQueryError != NULL)
 	{
-		RaiseDeferredError(unsupportedQueryError, ERROR);
+		RaiseDeferredError(unsupportedQueryError, DEBUG2);
+		return NULL;
 	}
 
 	/* extract where clause qualifiers and verify we can plan for them */
@@ -679,7 +683,8 @@ MultiNodeTree(Query *queryTree)
 	unsupportedQueryError = DeferErrorIfUnsupportedClause(whereClauseList);
 	if (unsupportedQueryError)
 	{
-		RaiseDeferredErrorInternal(unsupportedQueryError, ERROR);
+		RaiseDeferredErrorInternal(unsupportedQueryError, DEBUG2);
+		return NULL;
 	}
 
 	/*

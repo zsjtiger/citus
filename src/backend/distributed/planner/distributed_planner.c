@@ -838,6 +838,17 @@ CreateDistributedPlan(uint64 planId, Query *originalQuery, Query *query, ParamLi
 													boundParams);
 	Assert(originalQuery != NULL);
 
+	bool alreadyTriedInlining = false;
+	Query *copyOfTheOriginalQuery = copyObject(originalQuery);
+
+restartRecursivePlanning:
+	if (!alreadyTriedInlining)
+	{
+		originalQuery = copyOfTheOriginalQuery;
+
+		RecursivelyInlineCtesInQueryTree(originalQuery);
+	}
+
 	/*
 	 * Plan subqueries and CTEs that cannot be pushed down by recursively
 	 * calling the planner and return the resulting plans to subPlanList.
@@ -892,6 +903,14 @@ CreateDistributedPlan(uint64 planId, Query *originalQuery, Query *query, ParamLi
 		distributedPlan = CreateDistributedPlan(planId, originalQuery, query, NULL, false,
 												plannerRestrictionContext);
 
+		if (!alreadyTriedInlining && distributedPlan->planningError != NULL)
+		{
+			alreadyTriedInlining = true;
+
+			goto restartRecursivePlanning;
+
+		}
+
 		/* distributedPlan cannot be null since hasUnresolvedParams argument was false */
 		Assert(distributedPlan != NULL);
 		distributedPlan->subPlanList = subPlanList;
@@ -919,6 +938,19 @@ CreateDistributedPlan(uint64 planId, Query *originalQuery, Query *query, ParamLi
 
 	MultiTreeRoot *logicalPlan = MultiLogicalPlanCreate(originalQuery, query,
 														plannerRestrictionContext);
+
+	if (logicalPlan == NULL)
+	{
+
+		distributedPlan = CitusMakeNode(DistributedPlan);
+
+		distributedPlan->planningError = DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
+				 "planning error",
+				 NULL, NULL);
+
+		return distributedPlan;
+	}
+
 	MultiLogicalPlanOptimize(logicalPlan);
 
 	/*
