@@ -742,12 +742,12 @@ LookupShardIdCacheEntry(int64 shardId)
 	}
 	else
 	{
+
 		/*
 		 * We might have some concurrent metadata changes. In order to get the changes,
 		 * we first need to accept the cache invalidation messages.
 		 */
 		AcceptInvalidationMessages();
-
 		if (!shardEntry->tableEntry->isValid)
 		{
 			Oid oldRelationId = shardEntry->tableEntry->relationId;
@@ -868,17 +868,18 @@ LookupCitusTableCacheEntry(Oid relationId)
 		}
 	}
 
-	/*
-	 * We might have some concurrent metadata changes. In order to get the changes,
-	 * we first need to accept the cache invalidation messages.
-	 */
-	AcceptInvalidationMessages();
+
 	CitusTableCacheEntrySlot *cacheSlot =
 		hash_search(DistTableCacheHash, hashKey, HASH_ENTER, &foundInCache);
 
 	/* return valid matches */
 	if (foundInCache)
 	{
+	    /*
+		* We might have some concurrent metadata changes. In order to get the changes,
+		* we first need to accept the cache invalidation messages.
+		*/
+		AcceptInvalidationMessages();
 		if (cacheSlot->isValid)
 		{
 			return cacheSlot->citusTableMetadata;
@@ -3338,6 +3339,10 @@ ResetCitusTableCacheEntry(CitusTableCacheEntry *cacheEntry)
 			pfree(placementArray);
 		}
 
+		bool foundInCache = false;
+		hash_search(DistTableCacheHash, &shardInterval->shardId, HASH_REMOVE,	
+					&foundInCache);
+
 		/* delete data pointed to by ShardInterval */
 		if (!valueByVal)
 		{
@@ -3445,7 +3450,7 @@ InvalidateForeignRelationGraphCacheCallback(Datum argument, Oid relationId)
  * other purposes.
  *
  * We acknowledge that it is not a very intuitive way of implementing this cache
- * invalidation, but, seems acceptable for now. If this becomes problematic, we
+ * invalidation, but, seems acceptable Ffor now. If this becomes problematic, we
  * could try using a magic oid where we're sure that no relation would ever use
  * that oid.
  */
@@ -3513,10 +3518,12 @@ InvalidateCitusTableCacheEntrySlot(CitusTableCacheEntrySlot *cacheSlot)
 	/* recheck whether this is a distributed table */
 	cacheSlot->isValid = false;
 
+
 	if (cacheSlot->citusTableMetadata != NULL)
 	{
 		/* reload the metadata */
 		cacheSlot->citusTableMetadata->isValid = false;
+
 	}
 }
 
