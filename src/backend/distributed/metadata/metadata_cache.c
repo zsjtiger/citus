@@ -3446,17 +3446,26 @@ InvalidateDistRelationCacheCallback(Datum argument, Oid relationId)
 		void *hashKey = (void *) &relationId;
 		bool foundInCache = false;
 
+		CitusTableCacheEntrySlot *cacheSlot = NULL;
+		bool isCitusTable = IsCitusTable(relationId);
+		if (isCitusTable) {
+			cacheSlot =
+				hash_search(DistTableCacheHash, hashKey, HASH_REMOVE, &foundInCache);
+		}else {
+			cacheSlot =
+				hash_search(DistTableCacheHash, hashKey, HASH_FIND, &foundInCache);
+		}
 
-		CitusTableCacheEntrySlot *cacheSlot =
-			hash_search(DistTableCacheHash, hashKey, HASH_REMOVE, &foundInCache);
 		if (foundInCache)
 		{
 			cacheSlot->data->isValid = false;
-			char * relname = get_rel_name(relationId);
-			ereport(WARNING, (errmsg("InvalidateDistRelationCacheCallback cache expired for %s, total expired: %d", relname, totalExpired++)));
-			MemoryContext oldContext = MemoryContextSwitchTo(MetadataCacheMemoryContext);
-			DistTableCacheExpired = lappend(DistTableCacheExpired, cacheSlot->data);
-			MemoryContextSwitchTo(oldContext);
+			if (isCitusTable) {
+				char * relname = get_rel_name(relationId);
+				ereport(WARNING, (errmsg("InvalidateDistRelationCacheCallback cache expired for %s, total expired: %d", relname, totalExpired++)));
+				MemoryContext oldContext = MemoryContextSwitchTo(MetadataCacheMemoryContext);
+				DistTableCacheExpired = lappend(DistTableCacheExpired, cacheSlot->data);
+				MemoryContextSwitchTo(oldContext);
+			}
 		}
 
 		/*
