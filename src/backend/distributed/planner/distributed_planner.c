@@ -1571,6 +1571,9 @@ BlessRecordExpression(Expr *expr)
 			currentResno++;
 		}
 
+		/* pass on the column names to the tuple descriptor */
+		ExecTypeSetColNames(rowTupleDesc, rowExpr->colnames);
+
 		BlessTupleDesc(rowTupleDesc);
 
 		typeMod = rowTupleDesc->tdtypmod;
