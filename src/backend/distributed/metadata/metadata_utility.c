@@ -67,6 +67,7 @@
 
 
 /* Local functions forward declarations */
+static List * ActiveShardPlacementInternal(uint64 shardId, bool onlyRemoteShards);
 static uint64 * AllocateUint64(uint64 value);
 static void RecordDistributedRelationDependencies(Oid distributedRelationId);
 static GroupShardPlacement * TupleToGroupShardPlacement(TupleDesc tupleDesc,
@@ -722,12 +723,44 @@ NodeGroupHasShardPlacements(int32 groupId, bool onlyConsiderActivePlacements)
 List *
 ActiveShardPlacementList(uint64 shardId)
 {
+	bool onlyRemoteShards = false;
+	return ActiveShardPlacementInternal(shardId, onlyRemoteShards);
+}
+
+
+/*
+ * ActiveRemoteShardPlacementList finds remote shard placements for the given shardId from
+ * system catalogs, chooses placements that are in active state, and returns
+ * these shard placements in a new list.
+ */
+List *
+ActiveRemoteShardPlacementList(uint64 shardId)
+{
+	bool onlyRemoteShards = true;
+	return ActiveShardPlacementInternal(shardId, onlyRemoteShards);
+}
+
+
+/*
+ * ActiveShardPlacementInternal finds shard placements for the given shardId from
+ * system catalogs, chooses placements that are in active state, and returns
+ * these shard placements in a new list. If onlyRemoteShards is true, it considers
+ * only remote shards.
+ */
+static List *
+ActiveShardPlacementInternal(uint64 shardId, bool onlyRemoteShards)
+{
 	List *activePlacementList = NIL;
 	List *shardPlacementList = ShardPlacementList(shardId);
 
+	int32 localGroupId = GetLocalGroupId();
 	ShardPlacement *shardPlacement = NULL;
 	foreach_ptr(shardPlacement, shardPlacementList)
 	{
+		if (onlyRemoteShards && shardPlacement->groupId == localGroupId)
+		{
+			continue;
+		}
 		if (shardPlacement->shardState == SHARD_STATE_ACTIVE)
 		{
 			activePlacementList = lappend(activePlacementList, shardPlacement);

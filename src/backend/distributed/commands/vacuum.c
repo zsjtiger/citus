@@ -245,7 +245,7 @@ VacuumTaskList(Oid relationId, CitusVacuumParams vacuumParams, List *vacuumColum
 		task->dependentTaskList = NULL;
 		task->replicationModel = REPLICATION_MODEL_INVALID;
 		task->anchorShardId = shardId;
-		task->taskPlacementList = ActiveShardPlacementList(shardId);
+		task->taskPlacementList = ActiveRemoteShardPlacementList(shardId);
 
 		taskList = lappend(taskList, task);
 	}
