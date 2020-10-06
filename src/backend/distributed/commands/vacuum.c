@@ -101,6 +101,13 @@ PostprocessVacuumStmt(VacuumStmt *vacuumStmt, const char *vacuumCommand)
 	{
 		if (IsCitusTable(relationId))
 		{
+			List *vacuumColumnList = VacuumColumnList(vacuumStmt, relationIndex);
+			List *taskList = VacuumTaskList(relationId, vacuumParams, vacuumColumnList);
+			if (list_length(taskList) == 0)
+			{
+				continue;
+			}
+
 			/*
 			 * VACUUM commands cannot run inside a transaction block, so we use
 			 * the "bare" commit protocol without BEGIN/COMMIT. However, ANALYZE
@@ -113,13 +120,6 @@ PostprocessVacuumStmt(VacuumStmt *vacuumStmt, const char *vacuumCommand)
 				Assert(SavedMultiShardCommitProtocol == COMMIT_PROTOCOL_BARE);
 				SavedMultiShardCommitProtocol = MultiShardCommitProtocol;
 				MultiShardCommitProtocol = COMMIT_PROTOCOL_BARE;
-			}
-
-			List *vacuumColumnList = VacuumColumnList(vacuumStmt, relationIndex);
-			List *taskList = VacuumTaskList(relationId, vacuumParams, vacuumColumnList);
-			if (list_length(taskList) == 0)
-			{
-				continue;
 			}
 
 			/* local execution is not implemented for VACUUM commands */

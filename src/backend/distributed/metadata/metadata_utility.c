@@ -67,7 +67,8 @@
 
 
 /* Local functions forward declarations */
-static List * ActiveShardPlacementInternal(uint64 shardId, bool onlyRemoteShards);
+static List * ActiveShardPlacementInternal(uint64 shardId, ShardPlacementSelector
+										   shardPlacementSelector);
 static uint64 * AllocateUint64(uint64 value);
 static void RecordDistributedRelationDependencies(Oid distributedRelationId);
 static GroupShardPlacement * TupleToGroupShardPlacement(TupleDesc tupleDesc,
@@ -723,8 +724,8 @@ NodeGroupHasShardPlacements(int32 groupId, bool onlyConsiderActivePlacements)
 List *
 ActiveShardPlacementList(uint64 shardId)
 {
-	bool onlyRemoteShards = false;
-	return ActiveShardPlacementInternal(shardId, onlyRemoteShards);
+	ShardPlacementSelector shardPlacementSelector = ALL_PLACEMENTS;
+	return ActiveShardPlacementInternal(shardId, shardPlacementSelector);
 }
 
 
@@ -736,8 +737,8 @@ ActiveShardPlacementList(uint64 shardId)
 List *
 ActiveRemoteShardPlacementList(uint64 shardId)
 {
-	bool onlyRemoteShards = true;
-	return ActiveShardPlacementInternal(shardId, onlyRemoteShards);
+	ShardPlacementSelector shardPlacementSelector = ONLY_REMOTE_PLACEMENTS;
+	return ActiveShardPlacementInternal(shardId, shardPlacementSelector);
 }
 
 
@@ -748,7 +749,8 @@ ActiveRemoteShardPlacementList(uint64 shardId)
  * only remote shards.
  */
 static List *
-ActiveShardPlacementInternal(uint64 shardId, bool onlyRemoteShards)
+ActiveShardPlacementInternal(uint64 shardId, ShardPlacementSelector
+							 shardPlacementSelector)
 {
 	List *activePlacementList = NIL;
 	List *shardPlacementList = ShardPlacementList(shardId);
@@ -757,10 +759,12 @@ ActiveShardPlacementInternal(uint64 shardId, bool onlyRemoteShards)
 	ShardPlacement *shardPlacement = NULL;
 	foreach_ptr(shardPlacement, shardPlacementList)
 	{
-		if (onlyRemoteShards && shardPlacement->groupId == localGroupId)
+		if (shardPlacementSelector == ONLY_REMOTE_PLACEMENTS && shardPlacement->groupId ==
+			localGroupId)
 		{
 			continue;
 		}
+
 		if (shardPlacement->shardState == SHARD_STATE_ACTIVE)
 		{
 			activePlacementList = lappend(activePlacementList, shardPlacement);

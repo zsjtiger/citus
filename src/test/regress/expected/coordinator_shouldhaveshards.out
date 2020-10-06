@@ -124,6 +124,70 @@ NOTICE:  executing the command locally: SELECT y FROM coordinator_shouldhaveshar
 (1 row)
 
 END;
+VACUUM test;
+VACUUM test, test;
+VACUUM ANALYZE test(x);
+ANALYZE test;
+ANALYZE test, test;
+set citus.log_remote_commands to ON;
+VACUUM test;
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+VACUUM test, test;
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing VACUUM coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+VACUUM ANALYZE test(x);
+NOTICE:  issuing VACUUM (ANALYZE) coordinator_shouldhaveshards.test_1503001 (x)
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing VACUUM (ANALYZE) coordinator_shouldhaveshards.test_1503002 (x)
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+ANALYZE test;
+NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(xx, xx, 'xxxxxxx');
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(xx, xx, 'xxxxxxx');
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing PREPARE TRANSACTION xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing PREPARE TRANSACTION xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing COMMIT PREPARED xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing COMMIT PREPARED xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+ANALYZE test, test;
+NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(xx, xx, 'xxxxxxx');
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(xx, xx, 'xxxxxxx');
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503001
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing ANALYZE coordinator_shouldhaveshards.test_1503002
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing PREPARE TRANSACTION xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing PREPARE TRANSACTION xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing COMMIT PREPARED xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+NOTICE:  issuing COMMIT PREPARED xxxxxxx
+DETAIL:  on server postgres@localhost:xxxxx connectionId: xxxxxxx
+set citus.log_remote_commands to OFF;
 SET citus.shard_count TO 6;
 SET citus.log_remote_commands TO OFF;
 BEGIN;

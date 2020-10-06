@@ -60,6 +60,19 @@ ALTER TABLE test DROP COLUMN z;
 SELECT y FROM test WHERE x = 1;
 END;
 
+VACUUM test;
+VACUUM test, test;
+VACUUM ANALYZE test(x);
+ANALYZE test;
+ANALYZE test, test;
+
+set citus.log_remote_commands to ON;
+VACUUM test;
+VACUUM test, test;
+VACUUM ANALYZE test(x);
+ANALYZE test;
+ANALYZE test, test;
+set citus.log_remote_commands to OFF;
 
 SET citus.shard_count TO 6;
 SET citus.log_remote_commands TO OFF;

@@ -53,6 +53,10 @@ s/"(on_update_fkey_table_|fkey_)[0-9]+"/"\1xxxxxxx"/g
 s/"(target_table_|target_table_|test_ref_table_)[0-9]+"/"\1xxxxxxx"/g
 s/\(col_1\)=\([0-9]+\)/(col_1)=(X)/g
 
+s/NOTICE:  issuing PREPARE TRANSACTION.*/NOTICE:  issuing PREPARE TRANSACTION xxxxxxx/g
+s/NOTICE:  issuing COMMIT PREPARED.*/NOTICE:  issuing COMMIT PREPARED xxxxxxx/g
+
+
 # In multi_name_lengths, normalize shard names
 s/name_len_12345678901234567890123456789012345678_fcd8ab6f_[0-9]+/name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx/g
 

@@ -87,6 +87,12 @@ typedef struct ShardPlacement
 	uint32 representativeValue;
 } ShardPlacement;
 
+typedef enum ShardPlacementSelector
+{
+	ONLY_REMOTE_PLACEMENTS,
+	ALL_PLACEMENTS
+} ShardPlacementSelector;
+
 
 /* Config variable managed via guc.c */
 extern int ReplicationModel;

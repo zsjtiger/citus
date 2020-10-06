@@ -58,6 +58,25 @@ BEGIN;
 ROLLBACK;
 
 VACUUM test;
+VACUUM test, test_2;
+VACUUM ANALYZE test(x);
+ANALYZE test;
+ANALYZE test, test_2;
+VACUUM ref;
+VACUUM ref, test;
+VACUUM ANALYZE ref, test, test_2;
+
+SET citus.log_remote_commands to ON;
+VACUUM test;
+VACUUM test, test_2;
+VACUUM ANALYZE test(x);
+ANALYZE test;
+ANALYZE test, test_2;
+VACUUM ref;
+VACUUM ref, test;
+VACUUM ANALYZE ref, test, test_2;
+SET citus.log_remote_commands to OFF;
+
 
 BEGIN;
 	ALTER TABLE test ADD COLUMN z INT DEFAULT 66;

@@ -55,6 +55,7 @@
 #include "distributed/multi_executor.h"
 #include "distributed/multi_explain.h"
 #include "distributed/multi_physical_planner.h"
+#include "distributed/shard_utils.h"
 #include "distributed/resource_lock.h"
 #include "distributed/transmit.h"
 #include "distributed/version_compat.h"
@@ -75,6 +76,7 @@ static int activeDropSchemaOrDBs = 0;
 
 
 /* Local functions forward declarations for helper functions */
+static void AppendLocalShardPlacementsToVacuum(VacuumStmt *vacuumStmt);
 static void ExecuteDistributedDDLJob(DDLJob *ddlJob);
 static char * SetSearchPathToCurrentSearchPathCommand(void);
 static char * CurrentSearchPath(void);
@@ -463,6 +465,11 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 	}
 
 	pstmt->utilityStmt = parsetree;
+	if (IsA(parsetree, VacuumStmt))
+	{
+		VacuumStmt *vacuumStmt = (VacuumStmt *) parsetree;
+		AppendLocalShardPlacementsToVacuum(vacuumStmt);
+	}
 
 	PG_TRY();
 	{
@@ -600,7 +607,6 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 	if (IsA(parsetree, VacuumStmt))
 	{
 		VacuumStmt *vacuumStmt = (VacuumStmt *) parsetree;
-
 		PostprocessVacuumStmt(vacuumStmt, queryString);
 	}
 
@@ -612,6 +618,29 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 		 */
 		CitusHasBeenLoaded();
 	}
+}
+
+
+/*
+ * AppendLocalShardPlacementsToVacuum appends the local shard placements
+ * to vacuum so that we can process them with the shell table. The reason
+ * for this is because standard_processUtility takes a global lock and prevents
+ * any other VACUUM to continue in the current database. So without this local shard
+ * placements would block the VACUUM to proceed in multi_processUtility.
+ */
+static void
+AppendLocalShardPlacementsToVacuum(VacuumStmt *vacuumStmt)
+{
+	List *shellVacuumRels = vacuumStmt->rels;
+	List *shellAndShardPlacementVacuumRels = list_copy(shellVacuumRels);
+	VacuumRelation *vacuumRelation = NULL;
+	foreach_ptr(vacuumRelation, shellVacuumRels)
+	{
+		shellAndShardPlacementVacuumRels = list_concat(shellAndShardPlacementVacuumRels,
+													   CreateTableLocalShardVacuumRelations(
+														   vacuumRelation));
+	}
+	vacuumStmt->rels = shellAndShardPlacementVacuumRels;
 }
 
 
