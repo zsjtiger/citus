@@ -117,6 +117,10 @@ PostprocessVacuumStmt(VacuumStmt *vacuumStmt, const char *vacuumCommand)
 
 			List *vacuumColumnList = VacuumColumnList(vacuumStmt, relationIndex);
 			List *taskList = VacuumTaskList(relationId, vacuumParams, vacuumColumnList);
+			if (list_length(taskList) == 0)
+			{
+				continue;
+			}
 
 			/* local execution is not implemented for VACUUM commands */
 			bool localExecutionSupported = false;
@@ -246,7 +250,10 @@ VacuumTaskList(Oid relationId, CitusVacuumParams vacuumParams, List *vacuumColum
 		task->replicationModel = REPLICATION_MODEL_INVALID;
 		task->anchorShardId = shardId;
 		task->taskPlacementList = ActiveRemoteShardPlacementList(shardId);
-
+		if (list_length(task->taskPlacementList) == 0)
+		{
+			continue;
+		}
 		taskList = lappend(taskList, task);
 	}
 

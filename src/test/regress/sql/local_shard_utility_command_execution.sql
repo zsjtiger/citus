@@ -112,7 +112,7 @@ BEGIN;
   TRUNCATE ref_table CASCADE;
 COMMIT;
 
--- as we do not support local ANALYZE execution yet, below block would error out
+-- analyze will work because we process it through standard utility
 BEGIN;
   TRUNCATE ref_table CASCADE;
   ANALYZE ref_table;

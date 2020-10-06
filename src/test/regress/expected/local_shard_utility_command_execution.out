@@ -243,7 +243,7 @@ NOTICE:  truncate cascades to table "dist_table_xxxxx"
 NOTICE:  truncate cascades to table "dist_table_xxxxx"
 ERROR:  cannot execute DDL on table "ref_table" because there was a parallel SELECT access to distributed table "dist_table" in the same transaction
 COMMIT;
--- as we do not support local ANALYZE execution yet, below block would error out
+-- analyze will work because we process it through standard utility
 BEGIN;
   TRUNCATE ref_table CASCADE;
 NOTICE:  truncate cascades to table "dist_table"
@@ -271,7 +271,6 @@ NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schem
 NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
 NOTICE:  executing the command locally: TRUNCATE TABLE local_commands_test_schema.dist_table_xxxxx CASCADE
   ANALYZE ref_table;
-ERROR:  cannot execute command because a local execution has accessed a placement in the transaction
 COMMIT;
 -- insert some data
 INSERT INTO ref_table VALUES(7);
