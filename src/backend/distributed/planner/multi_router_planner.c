@@ -168,6 +168,7 @@ static List * ExtractInsertValuesList(Query *query, Var *partitionColumn);
 static DeferredErrorMessage * MultiRouterPlannableQuery(Query *query);
 static DeferredErrorMessage * ErrorIfQueryHasUnroutableModifyingCTE(Query *queryTree);
 static bool SelectsFromDistributedTable(List *rangeTableList, Query *query);
+static bool JoinTreeContainsLocalTableWalker(Node *joinTreeNode, void *context);
 static ShardPlacement * CreateDummyPlacement(bool hasLocalRelation);
 static ShardPlacement * CreateLocalDummyPlacement();
 static List * get_all_actual_clauses(List *restrictinfo_list);
@@ -2125,6 +2126,48 @@ SelectsFromDistributedTable(List *rangeTableList, Query *query)
 
 
 /*
+ * JoinTreeContainsSubqueryWalker returns true if the input joinTreeNode
+ * references to a subquery. Otherwise, recurses into the expression.
+ */
+static bool
+JoinTreeContainsLocalTableWalker(Node *joinTreeNode, void *context)
+{
+	if (joinTreeNode == NULL)
+	{
+		return false;
+	}
+
+	if (IsA(joinTreeNode, RangeTblRef))
+	{
+
+		Query *query = (Query *) context;
+
+		RangeTblRef *rangeTableRef = (RangeTblRef *) joinTreeNode;
+		RangeTblEntry *rangeTableEntry = rt_fetch(rangeTableRef->rtindex, query->rtable);
+
+		if (rangeTableEntry->rtekind != RTE_RELATION)
+		{
+			return false;
+		}
+
+		if  (rangeTableEntry->rtekind == RELKIND_RELATION ||
+				rangeTableEntry->rtekind == RELKIND_PARTITIONED_TABLE||
+				rangeTableEntry->rtekind == RELKIND_FOREIGN_TABLE)
+		{
+			return !IsCitusTable(rangeTableEntry->relid);
+		}
+		else if (rangeTableEntry->rtekind == RELKIND_MATVIEW)
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	return expression_tree_walker(joinTreeNode, JoinTreeContainsLocalTableWalker, context);
+}
+
+/*
  * RouterQuery runs router pruning logic for SELECT, UPDATE and DELETE queries.
  * If there are shards present and query is routable, all RTEs have been updated
  * to point to the relevant shards in the originalQuery. Also, placementList is
@@ -2267,8 +2310,7 @@ PlanRouterQuery(Query *originalQuery,
 
 	/* both Postgres tables and materialized tables are locally avaliable */
 	RTEListProperties *rteProperties = GetRTEListPropertiesForQuery(originalQuery);
-	bool hasPostgresLocalRelation =
-		rteProperties->hasPostgresLocalTable || rteProperties->hasMaterializedView;
+	bool hasPostgresLocalRelation = JoinTreeContainsLocalTableWalker((Node *)originalQuery->jointree, originalQuery);
 	List *taskPlacementList =
 		CreateTaskPlacementListForShardIntervals(*prunedShardIntervalListList,
 												 shardsPresent,
@@ -3478,6 +3520,10 @@ MultiRouterPlannableQuery(Query *query)
 			Oid distributedTableId = rte->relid;
 
 			/* local tables are allowed if there are no distributed tables */
+			if  (rte->relkind ==  RELKIND_MATVIEW)
+			{
+				continue;
+			}
 			if (!IsCitusTable(distributedTableId))
 			{
 				hasPostgresOrCitusLocalTable = true;
