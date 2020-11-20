@@ -107,7 +107,6 @@ static void CStoreTableAMProcessUtility(PlannedStmt *plannedStatement,
 										char *completionTag);
 #endif
 
-static bool IsCStoreTableAmTable(Oid relationId);
 static bool ConditionalLockRelationWithTimeout(Relation rel, LOCKMODE lockMode,
 											   int timeout, int retryInterval);
 static void LogRelationStats(Relation rel, int elevel);
@@ -1237,7 +1236,7 @@ CStoreTableAMObjectAccessHook(ObjectAccessType access, Oid classId, Oid objectId
  * IsCStoreTableAmTable returns true if relation has cstore_tableam
  * access method. This can be called before extension creation.
  */
-static bool
+bool
 IsCStoreTableAmTable(Oid relationId)
 {
 	if (!OidIsValid(relationId))
@@ -1357,6 +1356,29 @@ CitusCreateAlterColumnarTableSet(char *qualifiedRelationName, void *context)
 					 quote_literal_cstr(CompressionTypeStr(options->compression)));
 
 	return buf.data;
+}
+
+
+char *
+CStoreGetTableOptionsDDL(Oid relationId)
+{
+	Relation relation = table_open(relationId, AccessShareLock);
+
+	DataFileMetadata *metadata = ReadDataFileMetadata(relation->rd_node.relNode, true);
+
+	CstoreTableDDLOptions options = {
+		.blockRowCount = metadata->blockRowCount,
+		.stripeRowCount = metadata->stripeRowCount,
+		.compression = metadata->compression
+	};
+
+	char *qualifiedRelationName = generate_relation_name(relationId, NIL);
+
+	char *optionsDDL = CitusCreateAlterColumnarTableSet(qualifiedRelationName, &options);
+
+	table_close(relation, AccessShareLock);
+
+	return optionsDDL;
 }
 
 
