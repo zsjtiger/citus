@@ -7,6 +7,8 @@
 #include "access/skey.h"
 #include "nodes/bitmapset.h"
 
+#include "distributed/coordinator_protocol.h"
+
 const TableAmRoutine * GetColumnarTableAmRoutine(void);
 extern void cstore_tableam_init(void);
 extern void cstore_tableam_finish(void);
@@ -18,5 +20,5 @@ extern TableScanDesc cstore_beginscan_extended(Relation relation, Snapshot snaps
 											   List *scanQual);
 
 extern bool IsCStoreTableAmTable(Oid relationId);
-extern char * CStoreGetTableOptionsDDL(Oid relationId);
+extern TableDDLCommand * CStoreGetTableOptionsDDL(Oid relationId);
 #endif

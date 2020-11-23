@@ -652,7 +652,7 @@ GetPreLoadTableCreationCommands(Oid relationId, bool includeSequenceDefaults)
 	/* add columnar options for cstore tables */
 	if (IsCStoreTableAmTable(relationId))
 	{
-		char *cstoreOptionsDDL = CStoreGetTableOptionsDDL(relationId);
+		TableDDLCommand *cstoreOptionsDDL = CStoreGetTableOptionsDDL(relationId);
 		if (cstoreOptionsDDL != NULL)
 		{
 			tableDDLEventList = lappend(tableDDLEventList, cstoreOptionsDDL);
@@ -886,6 +886,25 @@ makeTableDDLCommandString(char *commandStr)
 
 
 /*
+ * makeTableDDLCommandString
+ */
+TableDDLCommand *
+makeTableDDLCommandFunction(TableDDLFunction function,
+							TableDDLShardedFunction shardedFunction,
+							void *context)
+{
+	TableDDLCommand *command = CitusMakeNode(TableDDLCommand);
+
+	command->type = TABLE_DDL_COMMAND_FUNCTION;
+	command->function.function = function;
+	command->function.shardedFunction = shardedFunction;
+	command->function.context = context;
+
+	return command;
+}
+
+
+/*
  * GetShardedTableDDLCommandString is the internal function for TableDDLCommand objects
  * created with makeTableDDLCommandString.
  */
@@ -942,6 +961,12 @@ GetShardedTableDDLCommand(TableDDLCommand *command, uint64 shardId, char *schema
 		{
 			return GetShardedTableDDLCommandString(command, shardId, schemaName);
 		}
+
+		case TABLE_DDL_COMMAND_FUNCTION:
+		{
+			return command->function.shardedFunction(command, shardId, schemaName,
+													 command->function.context);
+		}
 	}
 
 	/* unreachable: compiler should warn/error when not all cases are covered above */
@@ -957,6 +982,11 @@ GetTableDDLCommand(TableDDLCommand *command)
 		case TABLE_DDL_COMMAND_STRING:
 		{
 			return GetTableDDLCommandString(command);
+		}
+
+		case TABLE_DDL_COMMAND_FUNCTION:
+		{
+			return command->function.function(command, command->function.context);
 		}
 	}
 

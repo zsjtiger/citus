@@ -43,12 +43,14 @@
 #include "utils/builtins.h"
 #include "utils/pg_rusage.h"
 #include "utils/rel.h"
+#include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
 #include "columnar/cstore.h"
 #include "columnar/cstore_customscan.h"
 #include "columnar/cstore_tableam.h"
 #include "columnar/cstore_version_compat.h"
+#include "distributed/commands.h"
 #include "distributed/commands/utility_hook.h"
 #include "distributed/metadata_cache.h"
 
@@ -1335,6 +1337,13 @@ typedef struct CstoreTableDDLOptions
 } CstoreTableDDLOptions;
 
 
+typedef struct ColumnarTableDDLContext
+{
+	RangeVar *var;
+	CstoreTableDDLOptions options;
+} ColumnarTableDDLContext;
+
+
 /*
  * CitusCreateAlterColumnarTableSet generates a portable
  */
@@ -1359,26 +1368,63 @@ CitusCreateAlterColumnarTableSet(char *qualifiedRelationName, void *context)
 }
 
 
-char *
+static char *
+GetTableDDLCommandColumnar(const TableDDLCommand *command, void *context)
+{
+	ColumnarTableDDLContext *tableDDLContext = (ColumnarTableDDLContext *) context;
+	RangeVar *var = tableDDLContext->var;
+
+	List *nameList = MakeNameListFromRangeVar(var);
+	char *qualifiedShardName = NameListToQuotedString(nameList);
+
+	return CitusCreateAlterColumnarTableSet(qualifiedShardName,
+											&tableDDLContext->options);
+}
+
+
+static char *
+GetShardedTableDDLCommandColumnar(const TableDDLCommand *command, uint64 shardId,
+								  char *schemaName, void *context)
+{
+	ColumnarTableDDLContext *tableDDLContext = (ColumnarTableDDLContext *) context;
+	RangeVar *var = copyObject(tableDDLContext->var);
+	AppendShardIdToName(&var->relname, shardId);
+
+	List *nameList = MakeNameListFromRangeVar(var);
+	char *qualifiedShardName = NameListToQuotedString(nameList);
+
+	return CitusCreateAlterColumnarTableSet(qualifiedShardName,
+											&tableDDLContext->options);
+}
+
+
+TableDDLCommand *
 CStoreGetTableOptionsDDL(Oid relationId)
 {
 	Relation relation = table_open(relationId, AccessShareLock);
 
 	DataFileMetadata *metadata = ReadDataFileMetadata(relation->rd_node.relNode, true);
 
-	CstoreTableDDLOptions options = {
-		.blockRowCount = metadata->blockRowCount,
-		.stripeRowCount = metadata->stripeRowCount,
-		.compression = metadata->compression
-	};
+	ColumnarTableDDLContext *context = (ColumnarTableDDLContext *) palloc0(
+		sizeof(ColumnarTableDDLContext));
 
-	char *qualifiedRelationName = generate_relation_name(relationId, NIL);
 
-	char *optionsDDL = CitusCreateAlterColumnarTableSet(qualifiedRelationName, &options);
+	Oid namespaceId = get_rel_namespace(relationId);
+	context->var = makeRangeVar(
+		get_namespace_name(namespaceId),
+		get_rel_name(relationId),
+		0);
+
+	context->options.blockRowCount = metadata->blockRowCount;
+	context->options.stripeRowCount = metadata->stripeRowCount;
+	context->options.compression = metadata->compression;
 
 	table_close(relation, AccessShareLock);
 
-	return optionsDDL;
+	return makeTableDDLCommandFunction(
+		GetTableDDLCommandColumnar,
+		GetShardedTableDDLCommandColumnar,
+		context);
 }
 
 

@@ -86,10 +86,17 @@ typedef enum
 typedef enum TableDDLCommandType
 {
 	TABLE_DDL_COMMAND_STRING,
+	TABLE_DDL_COMMAND_FUNCTION,
 } TableDDLCommandType;
 
 
-typedef struct TableDDLCommand
+struct TableDDLCommand;
+typedef struct TableDDLCommand TableDDLCommand;
+typedef char *(*TableDDLFunction)(const TableDDLCommand *command, void *context);
+typedef char *(*TableDDLShardedFunction)(const TableDDLCommand *command, uint64 shardId,
+										 char *schemaName, void *context);
+
+struct TableDDLCommand
 {
 	CitusNode node;
 
@@ -98,11 +105,23 @@ typedef struct TableDDLCommand
 	union
 	{
 		char *commandStr;
+
+		struct
+		{
+			TableDDLFunction function;
+			TableDDLShardedFunction shardedFunction;
+			void *context;
+		}
+		function;
 	};
-} TableDDLCommand;
+};
 
 /* make functions for TableDDLCommand */
 extern TableDDLCommand * makeTableDDLCommandString(char *commandStr);
+extern TableDDLCommand * makeTableDDLCommandFunction(TableDDLFunction function,
+													 TableDDLShardedFunction
+													 shardedFunction,
+													 void *context);
 
 extern char * GetShardedTableDDLCommand(TableDDLCommand *command, uint64 shardId,
 										char *schemaName);
