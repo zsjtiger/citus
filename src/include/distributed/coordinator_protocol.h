@@ -83,6 +83,31 @@ typedef enum
 	SHARD_PLACEMENT_RANDOM = 3
 } ShardPlacementPolicyType;
 
+typedef enum TableDDLCommandType
+{
+	TABLE_DDL_COMMAND_STRING,
+} TableDDLCommandType;
+
+
+typedef struct TableDDLCommand
+{
+	CitusNode node;
+
+	TableDDLCommandType type;
+
+	union
+	{
+		char *commandStr;
+	};
+} TableDDLCommand;
+
+/* make functions for TableDDLCommand */
+extern TableDDLCommand * makeTableDDLCommandString(char *commandStr);
+
+extern char * GetShardedTableDDLCommand(TableDDLCommand *command, uint64 shardId,
+										char *schemaName);
+extern char * GetTableDDLCommand(TableDDLCommand *command);
+
 
 /* Config variables managed via guc.c */
 extern int ShardCount;
