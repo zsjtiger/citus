@@ -1542,6 +1542,8 @@ BlessRecordExpression(Expr *expr)
 			currentResno++;
 		}
 
+		ExecTypeSetColNames(rowTupleDesc, rowExpr->colnames);
+
 		BlessTupleDesc(rowTupleDesc);
 
 		typeMod = rowTupleDesc->tdtypmod;

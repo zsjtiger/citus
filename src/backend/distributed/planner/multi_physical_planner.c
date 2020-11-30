@@ -3776,15 +3776,22 @@ PartitionedOnColumn(Var *column, List *rangeTableList, List *dependentJobList)
 }
 
 
-/* Checks that the join clause references only simple columns. */
+/*
+ * CheckJoinBetweenColumns checks that the join clause references only simple
+ * columns, possibly wrapped in implicit coercions or collate expressions.
+ */
 static void
 CheckJoinBetweenColumns(OpExpr *joinClause)
 {
 	List *argumentList = joinClause->args;
 	Node *leftArgument = (Node *) linitial(argumentList);
 	Node *rightArgument = (Node *) lsecond(argumentList);
-	Node *strippedLeftArgument = strip_implicit_coercions(leftArgument);
-	Node *strippedRightArgument = strip_implicit_coercions(rightArgument);
+
+	Node *strippedLeftArgument = StripCollation(leftArgument);
+	Node *strippedRightArgument = StripCollation(rightArgument);
+
+	strippedLeftArgument = strip_implicit_coercions(strippedLeftArgument);
+	strippedRightArgument = strip_implicit_coercions(strippedRightArgument);
 
 	NodeTag leftArgumentType = nodeTag(strippedLeftArgument);
 	NodeTag rightArgumentType = nodeTag(strippedRightArgument);

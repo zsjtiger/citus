@@ -1317,6 +1317,14 @@ LeftColumnOrNULL(OpExpr *joinClause)
 	List *argumentList = joinClause->args;
 	Node *leftArgument = (Node *) linitial(argumentList);
 
+	/*
+	 * strip_implicit_coercions does not deal with CollateExpr, so we strip it
+	 * separately. We can ignore collations when looking at join columns,
+	 * because they are implicitly the same on both sides (non-matching explicit
+	 * collations error out in the planner).
+	 */
+	leftArgument = StripCollation(leftArgument);
+
 	leftArgument = strip_implicit_coercions(leftArgument);
 	if (!IsA(leftArgument, Var))
 	{
@@ -1336,12 +1344,36 @@ RightColumnOrNULL(OpExpr *joinClause)
 	List *argumentList = joinClause->args;
 	Node *rightArgument = (Node *) lsecond(argumentList);
 
+	/*
+	 * strip_implicit_coercions does not deal with CollateExpr, so we strip it
+	 * separately. We can ignore collations when looking at join columns,
+	 * because they are implicitly the same on both sides (non-matching explicit
+	 * collations error out in the planner).
+	 */
+	rightArgument = StripCollation(rightArgument);
+
 	rightArgument = strip_implicit_coercions(rightArgument);
 	if (!IsA(rightArgument, Var))
 	{
 		return NULL;
 	}
 	return castNode(Var, rightArgument);
+}
+
+
+/*
+ * StripCollation strips CollateExpr from an expression, if any.
+ */
+Node *
+StripCollation(Node *node)
+{
+	if (IsA(node, CollateExpr))
+	{
+		CollateExpr *collation = (CollateExpr *) node;
+		node = (Node *) collation->arg;
+	}
+
+	return node;
 }
 
 
