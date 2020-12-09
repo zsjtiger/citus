@@ -21,12 +21,12 @@ jobs:
 
   build-12:
     docker:
-      - image: 'citus/extbuilder:12.4'
+      - image: 'citus/extbuilder:12.5-compression'
     steps:
       - checkout
       - run:
           name: 'Configure, Build, and Install'
-          command: build-ext
+          command: PG_MAJOR=12 build-ext
       - persist_to_workspace:
           root: .
           paths:
@@ -35,12 +35,12 @@ jobs:
 
   build-13:
     docker:
-      - image: 'citus/extbuilder:13.0'
+      - image: 'citus/extbuilder:13.1-compression'
     steps:
       - checkout
       - run:
           name: 'Configure, Build, and Install'
-          command: build-ext
+          command: PG_MAJOR=13 build-ext
       - persist_to_workspace:
           root: .
           paths:
@@ -245,7 +245,7 @@ jobs:
 
   test-12_check-multi:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -259,7 +259,7 @@ jobs:
           flags: 'test_12,multi'
   test-12_check-vanilla:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -274,7 +274,7 @@ jobs:
 
   test-12_check-mx:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -289,7 +289,7 @@ jobs:
 
   test-12_check-isolation:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -304,7 +304,7 @@ jobs:
 
   test-12_check-worker:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -319,7 +319,7 @@ jobs:
 
   test-12_check-follower-cluster:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -344,7 +344,7 @@ jobs:
 
   test-12_check-columnar:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -359,7 +359,7 @@ jobs:
 
   test-12_check-columnar-isolation:
     docker:
-      - image: 'citus/exttester:12.4'
+      - image: 'citus/exttester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -374,7 +374,7 @@ jobs:
 
   test-12_check-failure:
     docker:
-      - image: 'citus/failtester:12.4'
+      - image: 'citus/failtester:12.5-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -412,7 +412,7 @@ jobs:
 
   test-13_check-multi:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -427,7 +427,7 @@ jobs:
 
   test-13_check-mx:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -442,7 +442,7 @@ jobs:
 
   test-13_check-vanilla:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -457,7 +457,7 @@ jobs:
 
   test-13_check-worker:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -472,7 +472,7 @@ jobs:
 
   test-13_check-isolation:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -487,7 +487,7 @@ jobs:
 
   test-13_check-follower-cluster:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -512,7 +512,7 @@ jobs:
 
   test-13_check-columnar:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -527,7 +527,7 @@ jobs:
 
   test-13_check-columnar-isolation:
     docker:
-      - image: 'citus/exttester:13.0'
+      - image: 'citus/exttester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -542,7 +542,7 @@ jobs:
 
   test-13_check-failure:
     docker:
-      - image: 'citus/failtester:13.0'
+      - image: 'citus/failtester:13.1-compression'
     working_directory: /home/circleci/project
     steps:
       - checkout
@@ -555,7 +555,7 @@ jobs:
 
   check-merge-to-enterprise:
     docker:
-      - image: citus/extbuilder:13.0
+      - image: citus/extbuilder:13.1-compression
     working_directory: /home/circleci/project
     steps:
       - checkout
