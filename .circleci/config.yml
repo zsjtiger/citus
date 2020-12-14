@@ -413,49 +413,49 @@ workflows:
       - run-citus-test:
           name: 'test-13_check-multi'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-multi
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-multi-mx'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-multi-mx
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-vanilla'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-vanilla
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-isolation'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-isolation
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-worker'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-worker
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-follower-cluster'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-follower-cluster
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-columnar'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-columnar
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-columnar-isolation'
           postgres: 13
-          tag: 13.1-dev20201211-4
+          tag: 13.1-dev20201215-1
           make: check-columnar-isolation
           requires: [build-13]
       - run-citus-test:
