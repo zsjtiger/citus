@@ -7,7 +7,7 @@ jobs:
 
   build-11:
     docker:
-      - image: 'citus/extbuilder:11.10-dev202012151451'
+      - image: 'citus/extbuilder:11.9-dev202012151810'
     steps:
       - checkout
       - run:
@@ -21,7 +21,7 @@ jobs:
 
   build-12:
     docker:
-      - image: 'citus/extbuilder:12.5-dev202012151451'
+      - image: 'citus/extbuilder:12.4-dev202012151810'
     steps:
       - checkout
       - run:
@@ -35,7 +35,7 @@ jobs:
 
   build-13:
     docker:
-      - image: 'citus/extbuilder:13.1-dev202012151451'
+      - image: 'citus/extbuilder:13.0-dev202012151810'
     steps:
       - checkout
       - run:
@@ -364,156 +364,156 @@ workflows:
       - run-citus-test:
           name: 'test-11_check-multi'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-multi
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-multi-mx'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-multi-mx
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-vanilla'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-vanilla
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-isolation'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-isolation
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-worker'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-worker
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-follower-cluster'
           postgres: 11
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-follower-cluster
           requires: [build-11]
       - run-citus-test:
           name: 'test-11_check-failure'
           postgres: 11
           image: citus/failtester
-          tag: 11.10-dev202012151451
+          tag: 11.9-dev202012151810
           make: check-failure
           requires: [build-11]
 
       - run-citus-test:
           name: 'test-12_check-multi'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-multi
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-multi-mx'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-multi-mx
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-vanilla'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-vanilla
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-isolation'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-isolation
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-worker'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-worker
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-follower-cluster'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-follower-cluster
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-columnar'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-columnar
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-columnar-isolation'
           postgres: 12
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-columnar-isolation
           requires: [build-12]
       - run-citus-test:
           name: 'test-12_check-failure'
           postgres: 12
           image: citus/failtester
-          tag: 12.5-dev202012151451
+          tag: 12.4-dev202012151810
           make: check-failure
           requires: [build-12]
 
       - run-citus-test:
           name: 'test-13_check-multi'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-multi
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-multi-mx'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-multi-mx
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-vanilla'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-vanilla
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-isolation'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-isolation
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-worker'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-worker
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-follower-cluster'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-follower-cluster
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-columnar'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-columnar
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-columnar-isolation'
           postgres: 13
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-columnar-isolation
           requires: [build-13]
       - run-citus-test:
           name: 'test-13_check-failure'
           postgres: 13
           image: citus/failtester
-          tag: 13.1-dev202012151451
+          tag: 13.0-dev202012151810
           make: check-failure
           requires: [build-13]
 
@@ -521,14 +521,14 @@ workflows:
           name: 'test-11-12_check-pg-upgrade'
           from: 11
           to: 12
-          tag: latest-dev202012151714
+          tag: latest-dev202012151810
           requires: [build-11,build-12]
 
       - test-pg-upgrade:
           name: 'test-12-13_check-pg-upgrade'
           from: 12
           to: 13
-          tag: latest-dev202012151714
+          tag: latest-dev202012151810
           requires: [build-12,build-13]
 
 #      - test-11_check-citus-upgrade:
