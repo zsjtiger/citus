@@ -47,73 +47,60 @@ jobs:
             - build-13/*
             - install-13.tar
 
-#  check-style:
-#    docker:
-#      - image: 'citus/stylechecker:latest'
-#    steps:
-#      - checkout
-#      - run:
-#          name: 'Check Style'
-#          command: citus_indent --check
-#      - run:
-#          name: 'Fix whitespace'
-#          command: ci/editorconfig.sh
-#      - run:
-#          name: 'Check if whitespace fixing changed anything, install editorconfig if it did'
-#          command: git diff --exit-code
-#      - run:
-#          name: 'Remove useless declarations'
-#          command: ci/remove_useless_declarations.sh
-#      - run:
-#          name: 'Check if changed'
-#          command: git diff --cached --exit-code
-#      - run:
-#          name: 'Normalize test output'
-#          command: ci/normalize_expected.sh
-#      - run:
-#          name: 'Check if changed'
-#          command: git diff --exit-code
-#      - run:
-#          name: 'Check for C-style comments in migration files'
-#          command: ci/disallow_c_comments_in_migrations.sh
-#      - run:
-#          name: 'Check if changed'
-#          command: git diff --exit-code
-#      - run:
-#          name: 'Check for lengths of changelog entries'
-#          command: ci/disallow_long_changelog_entries.sh
-#      - run:
-#          name: 'Check for banned C API usage'
-#          command: ci/banned.h.sh
-#      - run:
-#          name: 'Check for tests missing in schedules'
-#          command: ci/check_all_tests_are_run.sh
-#      - run:
-#          name: 'Check if all CI scripts are actually run'
-#          command: ci/check_all_ci_scripts_are_run.sh
-#
-#  check-sql-snapshots:
-#    docker:
-#      - image: 'citus/extbuilder:latest'
-#    steps:
-#      - checkout
-#      - run:
-#          name: 'Check Snapshots'
-#          command: ci/check_sql_snapshots.sh
-#
-#  test-11_check-failure:
-#    docker:
-#      - image: 'citus/failtester:11.9'
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - attach_workspace:
-#          at: .
-#      - run:
-#          name: 'Install and Test (check-failure)'
-#          command: 'chown -R circleci:circleci /home/circleci && install-and-test-ext check-failure'
-#          no_output_timeout: 2m
-#
+  check-style:
+    docker:
+      - image: 'citus/stylechecker:latest'
+    steps:
+      - checkout
+      - run:
+          name: 'Check Style'
+          command: citus_indent --check
+      - run:
+          name: 'Fix whitespace'
+          command: ci/editorconfig.sh
+      - run:
+          name: 'Check if whitespace fixing changed anything, install editorconfig if it did'
+          command: git diff --exit-code
+      - run:
+          name: 'Remove useless declarations'
+          command: ci/remove_useless_declarations.sh
+      - run:
+          name: 'Check if changed'
+          command: git diff --cached --exit-code
+      - run:
+          name: 'Normalize test output'
+          command: ci/normalize_expected.sh
+      - run:
+          name: 'Check if changed'
+          command: git diff --exit-code
+      - run:
+          name: 'Check for C-style comments in migration files'
+          command: ci/disallow_c_comments_in_migrations.sh
+      - run:
+          name: 'Check if changed'
+          command: git diff --exit-code
+      - run:
+          name: 'Check for lengths of changelog entries'
+          command: ci/disallow_long_changelog_entries.sh
+      - run:
+          name: 'Check for banned C API usage'
+          command: ci/banned.h.sh
+      - run:
+          name: 'Check for tests missing in schedules'
+          command: ci/check_all_tests_are_run.sh
+      - run:
+          name: 'Check if all CI scripts are actually run'
+          command: ci/check_all_ci_scripts_are_run.sh
+
+  check-sql-snapshots:
+    docker:
+      - image: 'citus/extbuilder:latest'
+    steps:
+      - checkout
+      - run:
+          name: 'Check Snapshots'
+          command: ci/check_sql_snapshots.sh
+
   test-pg-upgrade:
     description: Runs postgres upgrade tests
     parameters:
@@ -179,35 +166,7 @@ jobs:
           when: on_fail
       - codecov/upload:
           flags: 'test_<< parameters.from >>_<< parameters.to >>,upgrade'
-#
-#  test-12-13_check-pg-upgrade:
-#    docker:
-#      - image: 'citus/pgupgradetester:latest'
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - attach_workspace:
-#          at: .
-#      - run:
-#          name: 'Install and test postgres upgrade'
-#          command: 'chown -R circleci:circleci /home/circleci && install-and-test-ext --target check-pg-upgrade --old-pg-version 12 --new-pg-version 13'
-#          no_output_timeout: 2m
-#      - codecov/upload:
-#          flags: 'test_12_13,upgrade'
-#
-#  test-12_check-failure:
-#    docker:
-#      - image: 'citus/failtester:12.4'
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - attach_workspace:
-#          at: .
-#      - run:
-#          name: 'Install and Test (check-failure)'
-#          command: 'chown -R circleci:circleci /home/circleci && install-and-test-ext check-failure'
-#          no_output_timeout: 2m
-#
+
 #  test-11_check-citus-upgrade:
 #    docker:
 #      - image: 'citus/citusupgradetester:11.9'
@@ -302,64 +261,63 @@ jobs:
           flags: 'test_<< parameters.postgres >>,<< parameters.make >>'
           when: always
 
-#
-#  check-merge-to-enterprise:
-#    docker:
-#      - image: citus/extbuilder:13.0
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - run:
-#          command: |
-#            ci/check_enterprise_merge.sh
-#
-#  ch_benchmark:
-#    docker:
-#      - image: buildpack-deps:stretch
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - azure-cli/install
-#      - azure-cli/login-with-service-principal
-#      - run:
-#          command: |
-#            cd ./src/test/hammerdb
-#            sh run_hammerdb.sh citusbot_ch_benchmark_rg
-#          name: install dependencies and run ch_benchmark tests
-#          no_output_timeout: 20m
-#
-#  tpcc_benchmark:
-#    docker:
-#      - image: buildpack-deps:stretch
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - azure-cli/install
-#      - azure-cli/login-with-service-principal
-#      - run:
-#          command: |
-#            cd ./src/test/hammerdb
-#            sh run_hammerdb.sh citusbot_tpcc_benchmark_rg
-#          name: install dependencies and run ch_benchmark tests
-#          no_output_timeout: 20m
+  check-merge-to-enterprise:
+    docker:
+      - image: citus/extbuilder:13.0
+    working_directory: /home/circleci/project
+    steps:
+      - checkout
+      - run:
+          command: |
+            ci/check_enterprise_merge.sh
+
+  ch_benchmark:
+    docker:
+      - image: buildpack-deps:stretch
+    working_directory: /home/circleci/project
+    steps:
+      - checkout
+      - azure-cli/install
+      - azure-cli/login-with-service-principal
+      - run:
+          command: |
+            cd ./src/test/hammerdb
+            sh run_hammerdb.sh citusbot_ch_benchmark_rg
+          name: install dependencies and run ch_benchmark tests
+          no_output_timeout: 20m
+
+  tpcc_benchmark:
+    docker:
+      - image: buildpack-deps:stretch
+    working_directory: /home/circleci/project
+    steps:
+      - checkout
+      - azure-cli/install
+      - azure-cli/login-with-service-principal
+      - run:
+          command: |
+            cd ./src/test/hammerdb
+            sh run_hammerdb.sh citusbot_tpcc_benchmark_rg
+          name: install dependencies and run ch_benchmark tests
+          no_output_timeout: 20m
 
 workflows:
   version: 2
   build_and_test:
     jobs:
 
-#      - check-merge-to-enterprise:
-#          filters:
-#            branches:
-#              ignore:
-#                - /release-[0-9]+\.[0-9]+.*/ # match with releaseX.Y.*
-#
+      - check-merge-to-enterprise:
+          filters:
+            branches:
+              ignore:
+                - /release-[0-9]+\.[0-9]+.*/ # match with releaseX.Y.*
+
       - build-11
       - build-12
       - build-13
 
-#      - check-style
-#      - check-sql-snapshots
+      - check-style
+      - check-sql-snapshots
 
       - run-citus-test:
           name: 'test-11_check-multi'
@@ -534,15 +492,15 @@ workflows:
 #      - test-11_check-citus-upgrade:
 #          requires: [build-11]
 
-#      - ch_benchmark:
-#          requires: [build-13]
-#          filters:
-#            branches:
-#              only:
-#                - /ch_benchmark\/.*/ # match with ch_benchmark/ prefix
-#      - tpcc_benchmark:
-#          requires: [build-13]
-#          filters:
-#            branches:
-#              only:
-#                - /tpcc_benchmark\/.*/ # match with tpcc_benchmark/ prefix
+      - ch_benchmark:
+          requires: [build-13]
+          filters:
+            branches:
+              only:
+                - /ch_benchmark\/.*/ # match with ch_benchmark/ prefix
+      - tpcc_benchmark:
+          requires: [build-13]
+          filters:
+            branches:
+              only:
+                - /tpcc_benchmark\/.*/ # match with tpcc_benchmark/ prefix
