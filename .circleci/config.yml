@@ -524,10 +524,12 @@ workflows:
           tag: latest-dev202012151714
           requires: [build-11,build-12]
 
-#      - test-12-13_check-pg-upgrade:
-#          requires:
-#            - build-12
-#            - build-13
+      - test-pg-upgrade:
+          name: 'test-12-13_check-pg-upgrade'
+          from: 12
+          to: 13
+          tag: latest-dev202012151714
+          requires: [build-12,build-13]
 
 #      - test-11_check-citus-upgrade:
 #          requires: [build-11]
