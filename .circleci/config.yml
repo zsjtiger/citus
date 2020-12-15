@@ -114,20 +114,65 @@ jobs:
 #          command: 'chown -R circleci:circleci /home/circleci && install-and-test-ext check-failure'
 #          no_output_timeout: 2m
 #
-#  test-11-12_check-pg-upgrade:
-#    docker:
-#      - image: 'citus/pgupgradetester:latest'
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - attach_workspace:
-#          at: .
-#      - run:
-#          name: 'Install and test postgres upgrade'
-#          command: 'chown -R circleci:circleci /home/circleci && install-and-test-ext --target check-pg-upgrade --old-pg-version 11 --new-pg-version 12'
-#          no_output_timeout: 2m
-#      - codecov/upload:
-#          flags: 'test_11_12,upgrade'
+  test-pg-upgrade:
+    description: Runs postgres upgrade tests
+    parameters:
+      image:
+        description: 'docker image to use as for the tests'
+        type: string
+        default: citus/pgupgradetester
+      tag:
+        description: 'docker image tag to use'
+        type: string
+        default: latest
+    docker:
+      - image: '<< parameters.image >>:<< parameters.tag >>'
+    working_directory: /home/circleci/project
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Install Extension'
+          command: |
+            tar xfv "${CIRCLE_WORKING_DIRECTORY}/install-11.tar" --directory /
+            tar xfv "${CIRCLE_WORKING_DIRECTORY}/install-12.tar" --directory /
+      - run:
+          name: 'Configure'
+          command: |
+            chown -R circleci .
+            gosu circleci ./configure
+      - run:
+          name: 'Enable core dumps'
+          command: |
+            ulimit -c unlimited
+      - run:
+          name: 'Install and test postgres upgrade'
+          command: |
+            gosu circleci \
+              make -C src/test/regress \
+                check-pg-upgrade \
+                old-bindir=/usr/lib/postgresql/11/bin \
+                new-bindir=/usr/lib/postgresql/12/bin
+          no_output_timeout: 2m
+      - run:
+          name: 'Regressions'
+          command: |
+            if [ -f "src/test/regress/regression.diffs" ]; then
+              cat src/test/regress/regression.diffs
+              exit 1
+            fi
+          when: on_fail
+      - run:
+          name: 'Copy coredumps'
+          command: |
+            mkdir -p /tmp/core_dumps
+            if ls core.* 1> /dev/null 2>&1; then
+                cp core.* /tmp/core_dumps
+            fi
+          when: on_fail
+      - codecov/upload:
+          flags: 'test_11_12,upgrade'
 #
 #  test-12-13_check-pg-upgrade:
 #    docker:
@@ -466,10 +511,10 @@ workflows:
           make: check-failure
           requires: [build-13]
 
-#      - test-11-12_check-pg-upgrade:
-#          requires:
-#            - build-11
-#            - build-12
+      - test-pg-upgrade:
+          name: 'test-11-12_check-pg-upgrade'
+          tag: latest-dev202012151714
+          requires: [build-11,build-12]
 
 #      - test-12-13_check-pg-upgrade:
 #          requires:
