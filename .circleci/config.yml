@@ -120,6 +120,9 @@ jobs:
       from:
         description: 'postgres major version to use before the upgrade'
         type: integer
+      to:
+        description: 'postgres major version to upgrade to'
+        type: integer
       image:
         description: 'docker image to use as for the tests'
         type: string
@@ -139,7 +142,7 @@ jobs:
           name: 'Install Extension'
           command: |
             tar xfv "${CIRCLE_WORKING_DIRECTORY}/install-<< parameters.from >>.tar" --directory /
-            tar xfv "${CIRCLE_WORKING_DIRECTORY}/install-12.tar" --directory /
+            tar xfv "${CIRCLE_WORKING_DIRECTORY}/install-<< parameters.to >>.tar" --directory /
       - run:
           name: 'Configure'
           command: |
@@ -156,7 +159,7 @@ jobs:
               make -C src/test/regress \
                 check-pg-upgrade \
                 old-bindir=/usr/lib/postgresql/<< parameters.from >>/bin \
-                new-bindir=/usr/lib/postgresql/12/bin
+                new-bindir=/usr/lib/postgresql/<< parameters.to >>/bin
           no_output_timeout: 2m
       - run:
           name: 'Regressions'
@@ -175,7 +178,7 @@ jobs:
             fi
           when: on_fail
       - codecov/upload:
-          flags: 'test_<< parameters.from >>_12,upgrade'
+          flags: 'test_<< parameters.from >>_<< parameters.to >>,upgrade'
 #
 #  test-12-13_check-pg-upgrade:
 #    docker:
@@ -517,6 +520,7 @@ workflows:
       - test-pg-upgrade:
           name: 'test-11-12_check-pg-upgrade'
           from: 11
+          to: 12
           tag: latest-dev202012151714
           requires: [build-11,build-12]
 
