@@ -164,6 +164,14 @@ jobs:
                 cp core.* /tmp/core_dumps
             fi
           when: on_fail
+      - store_artifacts:
+          name: 'Save regressions'
+          path: src/test/regress/regression.diffs
+          when: on_fail
+      - store_artifacts:
+          name: 'Save core dumps'
+          path: /tmp/core_dumps
+          when: on_fail
       - codecov/upload:
           flags: 'test_<< parameters.from >>_<< parameters.to >>,upgrade'
 
@@ -223,6 +231,14 @@ jobs:
             if ls core.* 1> /dev/null 2>&1; then
                 cp core.* /tmp/core_dumps
             fi
+          when: on_fail
+      - store_artifacts:
+          name: 'Save regressions'
+          path: src/test/regress/regression.diffs
+          when: on_fail
+      - store_artifacts:
+          name: 'Save core dumps'
+          path: /tmp/core_dumps
           when: on_fail
       - codecov/upload:
           flags: 'test_<< parameters.postgres >>,upgrade'
