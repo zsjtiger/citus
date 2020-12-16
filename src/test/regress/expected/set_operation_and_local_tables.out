@@ -295,13 +295,11 @@ DEBUG:  Local tables cannot be used in distributed queries.
 DEBUG:  generating subplan XXX_1 for subquery SELECT x FROM recursive_set_local.local_test
 DEBUG:  Router planner cannot handle multi-shard select queries
 DEBUG:  generating subplan XXX_2 for subquery SELECT x FROM recursive_set_local.test
-DEBUG:  Creating router plan
-DEBUG:  generating subplan XXX_3 for subquery SELECT x FROM (SELECT intermediate_result.x FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(x integer)) foo WHERE (x OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.x FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(x integer)))
 DEBUG:  Router planner cannot handle multi-shard select queries
-DEBUG:  generating subplan XXX_4 for subquery SELECT x FROM recursive_set_local.test
+DEBUG:  generating subplan XXX_3 for subquery SELECT x FROM recursive_set_local.test
 DEBUG:  Creating router plan
-DEBUG:  generating subplan XXX_5 for subquery SELECT intermediate_result.x FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(x integer) UNION SELECT intermediate_result.x FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(x integer)
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT x FROM (SELECT intermediate_result.x FROM read_intermediate_result('XXX_5'::text, 'binary'::citus_copy_format) intermediate_result(x integer)) u ORDER BY x
+DEBUG:  generating subplan XXX_4 for subquery SELECT intermediate_result.x FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(x integer) UNION SELECT foo.x FROM (SELECT intermediate_result.x FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(x integer)) foo WHERE (foo.x OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.x FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(x integer)))
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT x FROM (SELECT intermediate_result.x FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(x integer)) u ORDER BY x
 DEBUG:  Creating router plan
  x
 ---------------------------------------------------------------------

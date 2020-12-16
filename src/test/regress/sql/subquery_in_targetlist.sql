@@ -161,6 +161,38 @@ FROM events_table e
 GROUP BY 1
 ORDER BY 1 LIMIT 3;
 
+-- correlated subquery on distributed table with reference table in FROM clause
+SELECT (SELECT e.value_2 FROM events_table e WHERE e.user_id = u.user_id AND e.value_2 = 1)
+FROM users_reference_table u
+ORDER BY 1 LIMIT 3;
+
+-- correlated subquery on distributed table with reference table in FROM clause in sublink: distributed tables joined indirectly
+SELECT (
+  SELECT (SELECT e.value_2 FROM events_table e WHERE e.user_id = u.user_id AND e.value_2 = 1)
+  FROM users_reference_table u
+  WHERE u.user_id = o.user_id
+)
+FROM users_table o WHERE o.value_2 = 3
+ORDER BY 1 LIMIT 3;
+
+-- correlated suquery on distributed table with reference table in FROM clause in sublink: distributed tables joined directly
+SELECT (
+  SELECT (SELECT max(e.value_2) FROM events_table e WHERE e.user_id = o.user_id GROUP BY e.user_id)
+  FROM users_reference_table u
+  WHERE u.user_id = o.user_id AND u.value_2 = 2
+)
+FROM users_table o WHERE o.user_id < 2
+ORDER BY 1 LIMIT 3;
+
+-- subquery on distributed table with reference table in FROM clause
+SELECT u.user_id, (SELECT e.user_id FROM events_table e WHERE e.user_id < 2 GROUP BY e.user_id)
+FROM users_reference_table u
+ORDER BY 1,2 LIMIT 3;
+
+SELECT u.user_id, (SELECT max(e.user_id) FROM events_table e WHERE value_2 = 1)
+FROM users_reference_table u
+ORDER BY 1,2 LIMIT 3;
+
 -- sublink in sublink with cte
 WITH cte_1 AS (SELECT user_id FROM users_table ORDER BY 1 LIMIT 1)
 SELECT (SELECT (SELECT e.user_id + user_id) FROM cte_1 WHERE user_id = e.user_id GROUP BY user_id)

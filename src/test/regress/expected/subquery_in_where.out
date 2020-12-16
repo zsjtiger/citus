@@ -333,8 +333,7 @@ DEBUG:  CTE cte is going to be inlined via distributed planning
 DEBUG:  push down of limit count: 10
 DEBUG:  generating subplan XXX_1 for subquery SELECT user_id, "time", value_1, value_2, value_3, value_4 FROM public.users_table ORDER BY user_id, value_2 DESC LIMIT 10
 DEBUG:  generating subplan XXX_2 for subquery SELECT value_2 FROM public.events_table
-DEBUG:  generating subplan XXX_3 for subquery SELECT user_id, "time", value_1, value_2, value_3, value_4 FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) sub_table WHERE (user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) cte
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM (SELECT sub_table.user_id, sub_table."time", sub_table.value_1, sub_table.value_2, sub_table.value_3, sub_table.value_4 FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) sub_table WHERE (sub_table.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))) cte
  count
 ---------------------------------------------------------------------
     10
@@ -369,8 +368,7 @@ FROM
 DEBUG:  push down of limit count: 10
 DEBUG:  generating subplan XXX_1 for subquery SELECT user_id, "time", value_1, value_2, value_3, value_4 FROM public.users_table ORDER BY user_id, value_2 DESC LIMIT 10
 DEBUG:  generating subplan XXX_2 for subquery SELECT value_2 FROM public.events_table
-DEBUG:  generating subplan XXX_3 for subquery SELECT user_id, "time", value_1, value_2, value_3, value_4 FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) sub_table_1 WHERE (user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) sub_table_2
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM (SELECT sub_table_1.user_id, sub_table_1."time", sub_table_1.value_1, sub_table_1.value_2, sub_table_1.value_3, sub_table_1.value_4 FROM (SELECT intermediate_result.user_id, intermediate_result."time", intermediate_result.value_1, intermediate_result.value_2, intermediate_result.value_3, intermediate_result.value_4 FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, "time" timestamp without time zone, value_1 integer, value_2 integer, value_3 double precision, value_4 bigint)) sub_table_1 WHERE (sub_table_1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))) sub_table_2
  count
 ---------------------------------------------------------------------
     10
@@ -424,9 +422,8 @@ DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.users_t
 DEBUG:  push down of limit count: 10
 DEBUG:  generating subplan XXX_2 for subquery SELECT user_id AS user_id_2 FROM public.users_table ORDER BY user_id LIMIT 10
 DEBUG:  generating subplan XXX_3 for subquery SELECT value_2 FROM public.events_table
-DEBUG:  generating subplan XXX_4 for subquery SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))
-DEBUG:  generating subplan XXX_5 for subquery SELECT min(user_id) AS min FROM public.events_table GROUP BY user_id
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT intermediate_result.user_id, intermediate_result.user_id_2 FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, user_id_2 integer)) t3 WHERE (user_id OPERATOR(pg_catalog.>) ANY (SELECT intermediate_result.min FROM read_intermediate_result('XXX_5'::text, 'binary'::citus_copy_format) intermediate_result(min integer)))
+DEBUG:  generating subplan XXX_4 for subquery SELECT min(user_id) AS min FROM public.events_table GROUP BY user_id
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))) t3 WHERE (user_id OPERATOR(pg_catalog.>) ANY (SELECT intermediate_result.min FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(min integer)))
  sum
 ---------------------------------------------------------------------
   18
@@ -477,9 +474,8 @@ DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.users_t
 DEBUG:  push down of limit count: 10
 DEBUG:  generating subplan XXX_2 for subquery SELECT user_id AS user_id_2 FROM public.users_table ORDER BY user_id LIMIT 10
 DEBUG:  generating subplan XXX_3 for subquery SELECT value_2 FROM public.events_table
-DEBUG:  generating subplan XXX_4 for subquery SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))
-DEBUG:  generating subplan XXX_5 for subquery SELECT 1, 2 FROM public.events_table WHERE (value_2 OPERATOR(pg_catalog.=) user_id)
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT intermediate_result.user_id, intermediate_result.user_id_2 FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, user_id_2 integer)) t3 WHERE (EXISTS (SELECT intermediate_result."?column?", intermediate_result."?column?_1" AS "?column?" FROM read_intermediate_result('XXX_5'::text, 'binary'::citus_copy_format) intermediate_result("?column?" integer, "?column?_1" integer)))
+DEBUG:  generating subplan XXX_4 for subquery SELECT 1, 2 FROM public.events_table WHERE (value_2 OPERATOR(pg_catalog.=) user_id)
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))) t3 WHERE (EXISTS (SELECT intermediate_result."?column?", intermediate_result."?column?_1" AS "?column?" FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result("?column?" integer, "?column?_1" integer)))
  sum
 ---------------------------------------------------------------------
   67
@@ -531,9 +527,8 @@ DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.users_t
 DEBUG:  push down of limit count: 10
 DEBUG:  generating subplan XXX_2 for subquery SELECT user_id AS user_id_2 FROM public.users_table ORDER BY user_id LIMIT 10
 DEBUG:  generating subplan XXX_3 for subquery SELECT value_2 FROM public.events_table
-DEBUG:  generating subplan XXX_4 for subquery SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))
-DEBUG:  generating subplan XXX_5 for subquery SELECT 1, 2 FROM public.events_table WHERE (value_2 OPERATOR(pg_catalog.=) (user_id OPERATOR(pg_catalog.+) 6))
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT intermediate_result.user_id, intermediate_result.user_id_2 FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer, user_id_2 integer)) t3 WHERE (NOT (EXISTS (SELECT intermediate_result."?column?", intermediate_result."?column?_1" AS "?column?" FROM read_intermediate_result('XXX_5'::text, 'binary'::citus_copy_format) intermediate_result("?column?" integer, "?column?_1" integer))))
+DEBUG:  generating subplan XXX_4 for subquery SELECT 1, 2 FROM public.events_table WHERE (value_2 OPERATOR(pg_catalog.=) (user_id OPERATOR(pg_catalog.+) 6))
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT sum(user_id) AS sum FROM (SELECT t1.user_id, t2.user_id_2 FROM ((SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)) t1 JOIN (SELECT intermediate_result.user_id_2 FROM read_intermediate_result('XXX_2'::text, 'binary'::citus_copy_format) intermediate_result(user_id_2 integer)) t2 ON ((t1.user_id OPERATOR(pg_catalog.=) t2.user_id_2))) WHERE (t1.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.value_2 FROM read_intermediate_result('XXX_3'::text, 'binary'::citus_copy_format) intermediate_result(value_2 integer)))) t3 WHERE (NOT (EXISTS (SELECT intermediate_result."?column?", intermediate_result."?column?_1" AS "?column?" FROM read_intermediate_result('XXX_4'::text, 'binary'::citus_copy_format) intermediate_result("?column?" integer, "?column?_1" integer))))
  sum
 ---------------------------------------------------------------------
   67
@@ -633,6 +628,84 @@ DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT generate_seri
                3
 (3 rows)
 
+-- subquery with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.user_id IN (SELECT user_id FROM events_table);
+DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.events_table
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM public.users_reference_table r WHERE (user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)))
+ count
+---------------------------------------------------------------------
+   101
+(1 row)
+
+-- subquery with reference table in FROM in subquery
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.user_id IN (SELECT user_id FROM events_table)
+) inner_false;
+DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.events_table
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM (SELECT r.user_id, random() AS random FROM public.users_reference_table r WHERE (r.user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)))) inner_false
+ count
+---------------------------------------------------------------------
+   101
+(1 row)
+
+-- correlated subquery with reference table in FROM in subquery and join on distribution column
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.value_2 IN (SELECT value_2 FROM events_table e WHERE e.user_id = r.user_id)
+) inner_false;
+ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
+-- correlated subquery with reference table in FROM in subquery and join on non-distribution column
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.value_2 IN (SELECT value_2 FROM events_table e WHERE e.value_2 = r.value_2)
+) inner_false;
+ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
+-- recursively plannable subquery in WHERE with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.user_id IN (SELECT user_id FROM events_table ORDER BY 1 LIMIT 1);
+DEBUG:  push down of limit count: 1
+DEBUG:  generating subplan XXX_1 for subquery SELECT user_id FROM public.events_table ORDER BY user_id LIMIT 1
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT count(*) AS count FROM public.users_reference_table r WHERE (user_id OPERATOR(pg_catalog.=) ANY (SELECT intermediate_result.user_id FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(user_id integer)))
+ count
+---------------------------------------------------------------------
+     7
+(1 row)
+
+-- correlated subquery in WHERE with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.value_2 IN (SELECT max(value_2) FROM events_table e WHERE e.user_id = r.user_id GROUP BY e.user_id);
+ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
+-- correlated subquery with reference table in FROM and correlated subquery on distributed table
+SELECT count(*)
+FROM users_table o
+WHERE o.value_2 IN (
+  SELECT (SELECT max(value_2) FROM events_table e WHERE e.user_id = o.user_id GROUP BY e.user_id)
+  FROM users_reference_table r
+);
+ count
+---------------------------------------------------------------------
+    14
+(1 row)
+
+-- subquery with reference table in FROM and correlated subquery on distributed table
+SELECT count(*)
+FROM users_table o
+WHERE o.value_2 IN (
+  SELECT (SELECT max(value_2) FROM events_table e WHERE e.user_id = r.user_id GROUP BY e.user_id)
+  FROM users_reference_table r
+);
+ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
 -- non-colocated subquery in WHERE clause ANDed with false
 SELECT count(*)
 FROM users_Table

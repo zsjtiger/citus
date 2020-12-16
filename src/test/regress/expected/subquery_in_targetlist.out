@@ -238,20 +238,80 @@ SELECT (SELECT (SELECT e.user_id + user_id) FROM users_reference_table WHERE use
 FROM events_table e
 GROUP BY 1
 ORDER BY 1 LIMIT 3;
+ ?column?
+---------------------------------------------------------------------
+        2
+        4
+        6
+(3 rows)
+
+-- correlated subquery on distributed table with reference table in FROM clause
+SELECT (SELECT e.value_2 FROM events_table e WHERE e.user_id = u.user_id AND e.value_2 = 1)
+FROM users_reference_table u
+ORDER BY 1 LIMIT 3;
 ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
+-- correlated subquery on distributed table with reference table in FROM clause in sublink: distributed tables joined indirectly
+SELECT (
+  SELECT (SELECT e.value_2 FROM events_table e WHERE e.user_id = u.user_id AND e.value_2 = 1)
+  FROM users_reference_table u
+  WHERE u.user_id = o.user_id
+)
+FROM users_table o WHERE o.value_2 = 3
+ORDER BY 1 LIMIT 3;
+ERROR:  complex joins are only supported when all distributed tables are co-located and joined on their distribution columns
+-- correlated suquery on distributed table with reference table in FROM clause in sublink: distributed tables joined directly
+SELECT (
+  SELECT (SELECT max(e.value_2) FROM events_table e WHERE e.user_id = o.user_id GROUP BY e.user_id)
+  FROM users_reference_table u
+  WHERE u.user_id = o.user_id AND u.value_2 = 2
+)
+FROM users_table o WHERE o.user_id < 2
+ORDER BY 1 LIMIT 3;
+ max
+---------------------------------------------------------------------
+   5
+   5
+   5
+(3 rows)
+
+-- subquery on distributed table with reference table in FROM clause
+SELECT u.user_id, (SELECT e.user_id FROM events_table e WHERE e.user_id < 2 GROUP BY e.user_id)
+FROM users_reference_table u
+ORDER BY 1,2 LIMIT 3;
+ERROR:  correlated subqueries are not supported when the FROM clause contains a reference table
+SELECT u.user_id, (SELECT max(e.user_id) FROM events_table e WHERE value_2 = 1)
+FROM users_reference_table u
+ORDER BY 1,2 LIMIT 3;
+ user_id | max
+---------------------------------------------------------------------
+       1 |   6
+       1 |   6
+       1 |   6
+(3 rows)
+
 -- sublink in sublink with cte
 WITH cte_1 AS (SELECT user_id FROM users_table ORDER BY 1 LIMIT 1)
 SELECT (SELECT (SELECT e.user_id + user_id) FROM cte_1 WHERE user_id = e.user_id GROUP BY user_id)
 FROM events_table e
 GROUP BY 1
 ORDER BY 1 LIMIT 3;
-ERROR:  correlated subqueries are not supported when the FROM clause contains a CTE or subquery
+ ?column?
+---------------------------------------------------------------------
+        2
+
+(2 rows)
+
 -- sublink in sublink
 SELECT (SELECT (SELECT e.user_id + user_id) FROM (SELECT 1 AS user_id) s WHERE user_id = e.user_id GROUP BY user_id)
 FROM events_table e
 GROUP BY 1
 ORDER BY 1 LIMIT 3;
-ERROR:  correlated subqueries are not supported when the FROM clause contains a subquery without FROM
+ ?column?
+---------------------------------------------------------------------
+        2
+
+(2 rows)
+
 -- sublink on view
 CREATE TEMP VIEW view_1 AS (SELECT user_id, value_2 FROM users_table WHERE user_id = 1 AND value_1 = 1 ORDER BY 1,2);
 -- with distribution column group by
@@ -335,7 +395,11 @@ CONTEXT:  while executing command on localhost:xxxxx
 SELECT (SELECT (SELECT user_id))
 FROM events_table e
 ORDER BY 1 LIMIT 1;
-ERROR:  correlated subqueries are not supported when the FROM clause contains a subquery without FROM
+ user_id
+---------------------------------------------------------------------
+       1
+(1 row)
+
 -- sublink with record type
 SELECT (SELECT u FROM users_table u WHERE u.user_id = e.user_id AND time = 'Thu Nov 23 09:26:42.145043 2017')
 FROM events_table e

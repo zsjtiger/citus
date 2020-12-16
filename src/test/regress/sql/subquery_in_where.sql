@@ -471,6 +471,61 @@ IN
 ORDER BY
 	generate_series ASC;
 
+-- subquery with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.user_id IN (SELECT user_id FROM events_table);
+
+-- subquery with reference table in FROM in subquery
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.user_id IN (SELECT user_id FROM events_table)
+) inner_false;
+
+-- correlated subquery with reference table in FROM in subquery and join on distribution column
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.value_2 IN (SELECT value_2 FROM events_table e WHERE e.user_id = r.user_id)
+) inner_false;
+
+-- correlated subquery with reference table in FROM in subquery and join on non-distribution column
+SELECT count(*)
+FROM (
+  SELECT r.user_id, random()
+  FROM users_reference_table r
+  WHERE r.value_2 IN (SELECT value_2 FROM events_table e WHERE e.value_2 = r.value_2)
+) inner_false;
+
+-- recursively plannable subquery in WHERE with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.user_id IN (SELECT user_id FROM events_table ORDER BY 1 LIMIT 1);
+
+-- correlated subquery in WHERE with reference table in FROM
+SELECT count(*)
+FROM users_reference_table r
+WHERE r.value_2 IN (SELECT max(value_2) FROM events_table e WHERE e.user_id = r.user_id GROUP BY e.user_id);
+
+-- correlated subquery with reference table in FROM and correlated subquery on distributed table
+SELECT count(*)
+FROM users_table o
+WHERE o.value_2 IN (
+  SELECT (SELECT max(value_2) FROM events_table e WHERE e.user_id = o.user_id GROUP BY e.user_id)
+  FROM users_reference_table r
+);
+
+-- subquery with reference table in FROM and correlated subquery on distributed table
+SELECT count(*)
+FROM users_table o
+WHERE o.value_2 IN (
+  SELECT (SELECT max(value_2) FROM events_table e WHERE e.user_id = r.user_id GROUP BY e.user_id)
+  FROM users_reference_table r
+);
+
 -- non-colocated subquery in WHERE clause ANDed with false
 SELECT count(*)
 FROM users_Table

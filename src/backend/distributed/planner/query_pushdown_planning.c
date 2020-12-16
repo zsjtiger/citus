@@ -74,6 +74,8 @@ static bool IsFunctionRTE(Node *node);
 static bool IsOuterJoinExpr(Node *node);
 static bool WindowPartitionOnDistributionColumn(Query *query);
 static DeferredErrorMessage * DeferErrorIfFromClauseRecurs(Query *queryTree);
+static bool IsRecurringQueryWithDistributedTableSublinks(Query *queryTree);
+static bool IsDistributedTableQuery(Node *node);
 static RecurringTuplesType FromClauseRecurringTupleType(Query *queryTree);
 static DeferredErrorMessage * DeferredErrorIfUnsupportedRecurringTuplesJoin(
 	PlannerRestrictionContext *plannerRestrictionContext);
@@ -660,12 +662,29 @@ DeferErrorIfUnsupportedSubqueryPushdown(Query *originalQuery,
 static DeferredErrorMessage *
 DeferErrorIfFromClauseRecurs(Query *queryTree)
 {
-	if (!queryTree->hasSubLinks)
+	if (!IsRecurringQueryWithDistributedTableSublinks(queryTree))
 	{
 		return NULL;
 	}
 
-	RecurringTuplesType recurType = FromClauseRecurringTupleType(queryTree);
+	/*
+	 * There is a distributed table outside of the FROM with recurring tuples
+	 * in the FROM.
+	 *
+	 * Try to figure out which type of recurring tuples we have to produce a
+	 * relevant error message. If there are several we'll pick the first one.
+	 */
+	RecurringTuplesType recurType = RECURRING_TUPLES_INVALID;
+
+	if (HasEmptyJoinTree(queryTree))
+	{
+		recurType = RECURRING_TUPLES_EMPTY_JOIN_TREE;
+	}
+	else
+	{
+		ContainsRecurringRangeTable(queryTree->rtable, &recurType);
+	}
+
 	if (recurType == RECURRING_TUPLES_REFERENCE_TABLE)
 	{
 		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
@@ -693,14 +712,123 @@ DeferErrorIfFromClauseRecurs(Query *queryTree)
 							 NULL);
 	}
 
+	return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
+						 "correlated subqueries are not supported when "
+						 "the FROM recurs", NULL,
+						 NULL);
+}
+
+
+/*
+ * IsRecurringQueryWithDistributedTableSublinks determines whether a query
+ * is recurring in the FROM clause with sublinks that have distributed tables
+ * in sublinks.
+ */
+static bool
+IsRecurringQueryWithDistributedTableSublinks(Query *query)
+{
+	RangeTblEntry *rangeTableEntry = NULL;
+
+	foreach_ptr(rangeTableEntry, query->rtable)
+	{
+		if (IsDistributedTableRTE((Node *) rangeTableEntry))
+		{
+			/* any distributed table in FROM makes the query non-recurring */
+			return false;
+		}
+	}
+
 	/*
-	 * We get here when there is neither a distributed table, nor recurring tuples.
-	 * That usually means that there isn't a FROM at all (only sublinks), this
-	 * implies that queryTree is recurring, but whether this is a problem depends
-	 * on outer queries, not on queryTree itself.
+	 * No distributed tables at this level of the query tree.
+	 *
+	 * Descend into FROM subqueries to find any violations.
+	 */
+	foreach_ptr(rangeTableEntry, query->rtable)
+	{
+		if (rangeTableEntry->rtekind == RTE_SUBQUERY)
+		{
+			if (IsDistributedTableQuery((Node *) rangeTableEntry->subquery))
+			{
+				/* any distributed table subquery in FROM makes the query non-recurring */
+				return false;
+			}
+		}
+	}
+
+	/*
+	 * The FROM is recurring, which is ok as long as there are no sublinks
+	 * which are not recurring.
 	 */
 
-	return NULL;
+	if (query->hasSubLinks)
+	{
+		List *targetList = query->targetList;
+		if (FindNodeMatchingCheckFunction((Node *) targetList, IsDistributedTableQuery))
+
+		{
+			/* distributed table subquery in SELECT */
+			return true;
+		}
+
+		FromExpr *joinTree = query->jointree;
+		if (joinTree != NULL)
+		{
+			if (FindNodeMatchingCheckFunction(joinTree->quals, IsDistributedTableQuery))
+			{
+				/* distributed table subquery in WHERE */
+				return true;
+			}
+		}
+
+		if (FindNodeMatchingCheckFunction(query->havingQual, IsDistributedTableQuery))
+		{
+			/* distributed table subquery in HAVING */
+			return true;
+		}
+	}
+
+	/*
+	 * Check whether any subqueries in FROM are in violation.
+	 */
+	foreach_ptr(rangeTableEntry, query->rtable)
+	{
+		if (rangeTableEntry->rtekind == RTE_SUBQUERY)
+		{
+			if (IsRecurringQueryWithDistributedTableSublinks(rangeTableEntry->subquery))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+
+/*
+ * IsDistributedTableQuery returns whether the given node is a query on a distributed
+ * table.
+ */
+static bool
+IsDistributedTableQuery(Node *node)
+{
+	if (!IsA(node, Query))
+	{
+		return false;
+	}
+
+	Query *queryTree = (Query *) node;
+	RangeTblEntry *rangeTableEntry = NULL;
+
+	foreach_ptr(rangeTableEntry, queryTree->rtable)
+	{
+		if (IsDistributedTableRTE((Node *) rangeTableEntry))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 
@@ -1051,13 +1179,6 @@ DeferErrorIfCannotPushdownSubquery(Query *subqueryTree, bool outerMostQueryHasLi
 						  "currently unsupported";
 		}
 	}
-
-	deferredError = DeferErrorIfFromClauseRecurs(subqueryTree);
-	if (deferredError)
-	{
-		return deferredError;
-	}
-
 
 	/* finally check and return deferred if not satisfied */
 	if (!preconditionsSatisfied)
