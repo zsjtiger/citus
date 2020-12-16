@@ -199,20 +199,14 @@ jobs:
       - run:
           name: 'Install and test citus upgrade'
           command: |
-            gosu circleci \
-              make -C src/test/regress \
-                check-citus-upgrade \
-                bindir=/usr/lib/postgresql/${PG_MAJOR}/bin \
-                citus-pre-tar=/install-pg11-citusv8.0.0.tar \
-                citus-post-tar=/home/circleci/project/install-$PG_MAJOR.tar
-#           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.1.0.tar
-#           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.2.0.tar
-#           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.3.0.tar
-#
-#           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.0.0.tar
-#           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.1.0.tar
-#           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.2.0.tar
-#           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.3.0.tar
+            for citus_version in ${CITUS_VERSIONS}; do \
+              gosu circleci \
+                make -C src/test/regress \
+                  check-citus-upgrade \
+                  bindir=/usr/lib/postgresql/${PG_MAJOR}/bin \
+                  citus-pre-tar=/install-pg11-citus${citus_version}.tar \
+                  citus-post-tar=/home/circleci/project/install-$PG_MAJOR.tar; \
+            done;
           no_output_timeout: 2m
       - run:
           name: 'Regressions'
