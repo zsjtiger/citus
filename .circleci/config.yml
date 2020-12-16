@@ -167,19 +167,44 @@ jobs:
       - codecov/upload:
           flags: 'test_<< parameters.from >>_<< parameters.to >>,upgrade'
 
-#  test-11_check-citus-upgrade:
-#    docker:
-#      - image: 'citus/citusupgradetester:11.9'
-#    working_directory: /home/circleci/project
-#    steps:
-#      - checkout
-#      - attach_workspace:
-#          at: .
-#      - run:
-#          name: 'Install and test citus upgrade'
-#          command: |
-#           chown -R circleci:circleci /home/circleci
-#           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.0.0.tar
+  test-citus-upgrade:
+    description: Runs citus upgrade tests
+    parameters:
+      postgres:
+        description: "postgres major version"
+        type: integer
+      image:
+        description: 'docker image to use as for the tests'
+        type: string
+        default: citus/citusupgradetester
+      tag:
+        description: 'docker image tag to use'
+        type: string
+    docker:
+      - image: '<< parameters.image >>:<< parameters.tag >>'
+    working_directory: /home/circleci/project
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Configure'
+          command: |
+            chown -R circleci .
+            gosu circleci ./configure
+      - run:
+          name: 'Enable core dumps'
+          command: |
+            ulimit -c unlimited
+      - run:
+          name: 'Install and test citus upgrade'
+          command: |
+            gosu circleci \
+              make -C src/test/regress \
+                check-citus-upgrade \
+                bindir=/usr/lib/postgresql/${PG_MAJOR}/bin \
+                citus-pre-tar=/install-pg11-citusv8.0.0.tar \
+                citus-post-tar=/home/circleci/project/install-$PG_MAJOR.tar
 #           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.1.0.tar
 #           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.2.0.tar
 #           install-and-test-ext --target check-citus-upgrade --citus-pre-tar /install-pg11-citusv8.3.0.tar
@@ -188,9 +213,25 @@ jobs:
 #           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.1.0.tar
 #           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.2.0.tar
 #           install-and-test-ext --target check-citus-upgrade-mixed --citus-pre-tar /install-pg11-citusv8.3.0.tar
-#          no_output_timeout: 2m
-#      - codecov/upload:
-#          flags: 'test_11,upgrade'
+          no_output_timeout: 2m
+      - run:
+          name: 'Regressions'
+          command: |
+            if [ -f "src/test/regress/regression.diffs" ]; then
+              cat src/test/regress/regression.diffs
+              exit 1
+            fi
+          when: on_fail
+      - run:
+          name: 'Copy coredumps'
+          command: |
+            mkdir -p /tmp/core_dumps
+            if ls core.* 1> /dev/null 2>&1; then
+                cp core.* /tmp/core_dumps
+            fi
+          when: on_fail
+      - codecov/upload:
+          flags: 'test_<< parameters.postgres >>,upgrade'
 
   run-citus-test:
     description: A job that does very little other than demonstrate what a parameterized job looks like
@@ -489,8 +530,11 @@ workflows:
           tag: latest-dev202012151914
           requires: [build-12,build-13]
 
-#      - test-11_check-citus-upgrade:
-#          requires: [build-11]
+      - test-citus-upgrade:
+          name: test-11_check-citus-upgrade
+          postgres: 11
+          tag: 11.10-dev202012161304
+          requires: [build-11]
 
       - ch_benchmark:
           requires: [build-13]
