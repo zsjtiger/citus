@@ -240,7 +240,7 @@ jobs:
           flags: 'test_<< parameters.postgres >>,upgrade'
 
   test-citus:
-    description: A job that does very little other than demonstrate what a parameterized job looks like
+    description: Runs the common tests of citus
     parameters:
       postgres:
         description: "postgres major version"
