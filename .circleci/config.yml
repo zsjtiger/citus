@@ -5,9 +5,21 @@ orbs:
 
 jobs:
 
-  build-11:
+  build:
+    description: Build the citus extension
+    parameters:
+      postgres:
+        description: postgres major version building citus for
+        type: integer
+      image:
+        description: docker image to use for the build
+        type: string
+        default: citus/extbuilder
+      tag:
+        description: tag to use for the docker image
+        type: string
     docker:
-      - image: 'citus/extbuilder:11.10-dev202012151914'
+      - image: '<< parameters.image >>:<< parameters.tag >>'
     steps:
       - checkout
       - run:
@@ -16,36 +28,8 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - build-11/*
-            - install-11.tar
-
-  build-12:
-    docker:
-      - image: 'citus/extbuilder:12.5-dev202012151914'
-    steps:
-      - checkout
-      - run:
-          name: 'Configure, Build, and Install'
-          command: build-ext
-      - persist_to_workspace:
-          root: .
-          paths:
-            - build-12/*
-            - install-12.tar
-
-  build-13:
-    docker:
-      - image: 'citus/extbuilder:13.1-dev202012151914'
-    steps:
-      - checkout
-      - run:
-          name: 'Configure, Build, and Install'
-          command: build-ext
-      - persist_to_workspace:
-          root: .
-          paths:
-            - build-13/*
-            - install-13.tar
+            - build-<< parameters.postgres >>/*
+            - install-<<parameters.postgres >>.tar
 
   check-style:
     docker:
@@ -254,7 +238,7 @@ jobs:
       - codecov/upload:
           flags: 'test_<< parameters.postgres >>,upgrade'
 
-  run-citus-test:
+  test-citus:
     description: A job that does very little other than demonstrate what a parameterized job looks like
     parameters:
       postgres:
@@ -374,50 +358,59 @@ workflows:
               ignore:
                 - /release-[0-9]+\.[0-9]+.*/ # match with releaseX.Y.*
 
-      - build-11
-      - build-12
-      - build-13
+      - build:
+          name: build-11
+          postgres: 11
+          tag: 11.10-dev202012151914
+      - build:
+          name: build-12
+          postgres: 12
+          tag: 12.5-dev202012151914
+      - build:
+          name: build-13
+          postgres: 13
+          tag: 13.1-dev202012151914
 
       - check-style
       - check-sql-snapshots
 
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-multi'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-multi
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-multi-mx'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-multi-mx
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-vanilla'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-vanilla
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-isolation'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-isolation
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-worker'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-worker
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-follower-cluster'
           postgres: 11
           tag: 11.10-dev202012151914
           make: check-follower-cluster
           requires: [build-11]
-      - run-citus-test:
+      - test-citus:
           name: 'test-11_check-failure'
           postgres: 11
           image: citus/failtester
@@ -425,55 +418,55 @@ workflows:
           make: check-failure
           requires: [build-11]
 
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-multi'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-multi
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-multi-mx'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-multi-mx
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-vanilla'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-vanilla
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-isolation'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-isolation
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-worker'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-worker
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-follower-cluster'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-follower-cluster
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-columnar'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-columnar
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-columnar-isolation'
           postgres: 12
           tag: 12.5-dev202012151914
           make: check-columnar-isolation
           requires: [build-12]
-      - run-citus-test:
+      - test-citus:
           name: 'test-12_check-failure'
           postgres: 12
           image: citus/failtester
@@ -481,55 +474,55 @@ workflows:
           make: check-failure
           requires: [build-12]
 
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-multi'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-multi
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-multi-mx'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-multi-mx
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-vanilla'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-vanilla
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-isolation'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-isolation
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-worker'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-worker
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-follower-cluster'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-follower-cluster
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-columnar'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-columnar
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-columnar-isolation'
           postgres: 13
           tag: 13.1-dev202012151914
           make: check-columnar-isolation
           requires: [build-13]
-      - run-citus-test:
+      - test-citus:
           name: 'test-13_check-failure'
           postgres: 13
           image: citus/failtester
