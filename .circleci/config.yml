@@ -543,7 +543,7 @@ workflows:
       - test-citus-upgrade:
           name: test-11_check-citus-upgrade
           postgres: 11
-          tag: 11.10-dev202012161304
+          tag: 11.10-dev202012161312
           requires: [build-11]
 
       - ch_benchmark:
