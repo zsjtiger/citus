@@ -231,8 +231,8 @@ _PG_init(void)
 	{
 		ereport(ERROR, (errmsg("Citus can only be loaded via shared_preload_libraries"),
 						errhint("Add citus to shared_preload_libraries configuration "
-								"variable in postgresql.conf in master and workers. Note "
-								"that citus should be at the beginning of "
+								"variable in postgresql.conf in coordinator and workers. "
+								"Note that citus should be at the beginning of "
 								"shared_preload_libraries.")));
 	}
 
@@ -1160,7 +1160,7 @@ RegisterCitusConfigVariables(void)
 		gettext_noop("Sets the maximum number of worker nodes that are tracked."),
 		gettext_noop("Worker nodes' network locations, their membership and "
 					 "health status are tracked in a shared hash table on "
-					 "the master node. This configuration value limits the "
+					 "the coordinator node. This configuration value limits the "
 					 "size of the hash table, and consequently the maximum "
 					 "number of worker nodes that can be tracked."
 					 "Citus keeps some information about the worker nodes "
@@ -1177,7 +1177,7 @@ RegisterCitusConfigVariables(void)
 	DefineCustomIntVariable(
 		"citus.remote_task_check_interval",
 		gettext_noop("Sets the frequency at which we check job statuses."),
-		gettext_noop("The master node assigns tasks to workers nodes, and "
+		gettext_noop("The coordinator node assigns tasks to workers nodes, and "
 					 "then regularly checks with them about each task's "
 					 "progress. This configuration value sets the time "
 					 "interval between two consequent checks."),
@@ -1349,7 +1349,7 @@ RegisterCitusConfigVariables(void)
 	DefineCustomEnumVariable(
 		"citus.task_assignment_policy",
 		gettext_noop("Sets the policy to use when assigning tasks to worker nodes."),
-		gettext_noop("The master node assigns tasks to worker nodes based on shard "
+		gettext_noop("The coordinator node assigns tasks to worker nodes based on shard "
 					 "locations. This configuration value specifies the policy to "
 					 "use when making these assignments. The greedy policy aims to "
 					 "evenly distribute tasks across worker nodes, first-replica just "
@@ -1380,7 +1380,7 @@ RegisterCitusConfigVariables(void)
 	DefineCustomEnumVariable(
 		"citus.task_executor_type",
 		gettext_noop("Sets the executor type to be used for distributed queries."),
-		gettext_noop("The master node chooses between two different executor types "
+		gettext_noop("The coordinator node chooses between two different executor types "
 					 "when executing a distributed query.The adaptive executor is "
 					 "optimal for simple key-value lookup queries and queries that "
 					 "involve aggregations and/or co-located joins on multiple shards. "),
@@ -1404,9 +1404,9 @@ RegisterCitusConfigVariables(void)
 	DefineCustomEnumVariable(
 		"citus.shard_placement_policy",
 		gettext_noop("Sets the policy to use when choosing nodes for shard placement."),
-		gettext_noop("The master node chooses which worker nodes to place new shards "
-					 "on. This configuration value specifies the policy to use when "
-					 "selecting these nodes. The local-node-first policy places the "
+		gettext_noop("The coordinator node chooses which worker nodes to place new "
+					 "shards on. This configuration value specifies the policy to use "
+					 "when selecting these nodes. The local-node-first policy places the "
 					 "first replica on the client node and chooses others randomly. "
 					 "The round-robin policy aims to distribute shards evenly across "
 					 "the cluster by selecting nodes in a round-robin fashion."

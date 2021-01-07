@@ -33,7 +33,7 @@ typedef enum CoordinatorEvaluationMode
 } CoordinatorEvaluationMode;
 
 /*
- * This struct is used to pass information to master
+ * This struct is used to pass information to the coordinator
  * evaluation logic.
  */
 typedef struct CoordinatorEvaluationContext

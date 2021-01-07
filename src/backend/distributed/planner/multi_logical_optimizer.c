@@ -70,14 +70,14 @@ int LimitClauseRowFetchCount = -1; /* number of rows to fetch from each task */
 double CountDistinctErrorRate = 0.0; /* precision of count(distinct) approximate */
 int CoordinatorAggregationStrategy = COORDINATOR_AGGREGATION_ROW_GATHER;
 
-/* Constant used throughout file */
-static const uint32 masterTableId = 1; /* first range table reference on the master node */
+/* first range table reference on the coordinator node */
+static const uint32 combineTableId = 1;
 
-typedef struct MasterAggregateWalkerContext
+typedef struct CoordinatorAggregateWalkerContext
 {
 	const ExtendedOpNodeProperties *extendedOpNodeProperties;
 	AttrNumber columnId;
-} MasterAggregateWalkerContext;
+} CoordinatorAggregateWalkerContext;
 
 typedef struct WorkerAggregateWalkerContext
 {
@@ -211,19 +211,20 @@ static void ParentSetNewChild(MultiNode *parentNode, MultiNode *oldChildNode,
 
 /* Local functions forward declarations for aggregate expressions */
 static void ApplyExtendedOpNodes(MultiExtendedOp *originalNode,
-								 MultiExtendedOp *masterNode,
+								 MultiExtendedOp *coordinatorNode,
 								 MultiExtendedOp *workerNode);
 static void TransformSubqueryNode(MultiTable *subqueryNode,
 								  bool subqueryHasNonDistributableAggregates);
-static MultiExtendedOp * MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
-											  ExtendedOpNodeProperties *
-											  extendedOpNodeProperties);
-static Node * MasterAggregateMutator(Node *originalNode,
-									 MasterAggregateWalkerContext *walkerContext);
-static Expr * MasterAggregateExpression(Aggref *originalAggregate,
-										MasterAggregateWalkerContext *walkerContext);
-static Expr * MasterAverageExpression(Oid sumAggregateType, Oid countAggregateType,
-									  AttrNumber *columnId);
+static MultiExtendedOp * CoordinatorExtendedOpNode(MultiExtendedOp *originalOpNode,
+												   ExtendedOpNodeProperties *
+												   extendedOpNodeProperties);
+static Node * CoordinatorAggregateMutator(Node *originalNode,
+										  CoordinatorAggregateWalkerContext *walkerContext);
+static Expr * CoordinatorAggregateExpression(Aggref *originalAggregate,
+											 CoordinatorAggregateWalkerContext *
+											 walkerContext);
+static Expr * CoordinatorAverageExpression(Oid sumAggregateType, Oid countAggregateType,
+										   AttrNumber *columnId);
 static Expr * AddTypeConversion(Node *originalAggregate, Node *newExpression);
 static MultiExtendedOp * WorkerExtendedOpNode(MultiExtendedOp *originalOpNode,
 											  ExtendedOpNodeProperties *
@@ -347,8 +348,8 @@ static bool ShouldProcessDistinctOrderAndLimitForWorker(
  * the function pushes down the project node; this node either contains columns
  * to return to the user, or aggregate expressions used by the aggregate node.
  * Third, the function pulls up the collect operators in the tree. Fourth, the
- * function finds the extended operator node, and splits this node into master
- * and worker extended operator nodes.
+ * function finds the extended operator node, and splits this node into
+ * coordinator and worker extended operator nodes.
  */
 void
 MultiLogicalPlanOptimize(MultiTreeRoot *multiLogicalPlan)
@@ -429,19 +430,19 @@ MultiLogicalPlanOptimize(MultiTreeRoot *multiLogicalPlan)
 	}
 
 	/*
-	 * We split the extended operator node into its equivalent master and worker
+	 * We split the extended operator node into its equivalent coordinator and worker
 	 * operator nodes; and if the extended operator has aggregates, we transform
-	 * aggregate functions accordingly for the master and worker operator nodes.
+	 * aggregate functions accordingly for the coordinator and worker operator nodes.
 	 * If we can push down the limit clause, we also add limit count and sort
 	 * clause list to the worker operator node. We then push the worker operator
 	 * node below the collect node.
 	 */
-	MultiExtendedOp *masterExtendedOpNode =
-		MasterExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
+	MultiExtendedOp *coordinatorExtendedOpNode =
+		CoordinatorExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
 	MultiExtendedOp *workerExtendedOpNode =
 		WorkerExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
 
-	ApplyExtendedOpNodes(extendedOpNode, masterExtendedOpNode, workerExtendedOpNode);
+	ApplyExtendedOpNodes(extendedOpNode, coordinatorExtendedOpNode, workerExtendedOpNode);
 
 	List *tableNodeList = FindNodesOfType(logicalPlanNode, T_MultiTable);
 	MultiTable *tableNode = NULL;
@@ -484,7 +485,7 @@ MultiLogicalPlanOptimize(MultiTreeRoot *multiLogicalPlan)
 								"count(distinct) or limit through configuration.")));
 	}
 
-	if (TargetListContainsSubquery(masterExtendedOpNode->targetList))
+	if (TargetListContainsSubquery(coordinatorExtendedOpNode->targetList))
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg("cannot push down subquery on the target list"),
@@ -1296,12 +1297,12 @@ ParentSetNewChild(MultiNode *parentNode, MultiNode *oldChildNode,
 
 /*
  * ApplyExtendedOpNodes replaces the original extended operator node with the
- * master and worker extended operator nodes. The function then pushes down the
+ * coordinator and worker extended operator nodes. The function then pushes down the
  * worker node below the original node's child node. Note that for the push down
  * to apply, the original node's child must be a collect node.
  */
 static void
-ApplyExtendedOpNodes(MultiExtendedOp *originalNode, MultiExtendedOp *masterNode,
+ApplyExtendedOpNodes(MultiExtendedOp *originalNode, MultiExtendedOp *coordinatorNode,
 					 MultiExtendedOp *workerNode)
 {
 	MultiNode *parentNode = ParentNode((MultiNode *) originalNode);
@@ -1312,9 +1313,9 @@ ApplyExtendedOpNodes(MultiExtendedOp *originalNode, MultiExtendedOp *masterNode,
 	Assert(CitusIsA(collectNode, MultiCollect));
 	Assert(UnaryOperator(parentNode));
 
-	/* swap the original aggregate node with the master extended node */
-	SetChild((MultiUnaryNode *) parentNode, (MultiNode *) masterNode);
-	SetChild((MultiUnaryNode *) masterNode, (MultiNode *) collectNode);
+	/* swap the original aggregate node with the coordinator extended node */
+	SetChild((MultiUnaryNode *) parentNode, (MultiNode *) coordinatorNode);
+	SetChild((MultiUnaryNode *) coordinatorNode, (MultiNode *) collectNode);
 
 	/* add the worker extended node below the collect node */
 	SetChild((MultiUnaryNode *) collectNode, (MultiNode *) workerNode);
@@ -1327,10 +1328,10 @@ ApplyExtendedOpNodes(MultiExtendedOp *originalNode, MultiExtendedOp *masterNode,
 
 /*
  * TransformSubqueryNode splits the extended operator node under subquery
- * multi table node into its equivalent master and worker operator nodes, and
- * we transform aggregate functions accordingly for the master and worker
+ * multi table node into its equivalent coordinator and worker operator nodes, and
+ * we transform aggregate functions accordingly for the coordinator and worker
  * operator nodes. We create a partition node based on the first group by
- * column of the extended operator node and set it as the child of the master
+ * column of the extended operator node and set it as the child of the coordinator
  * operator node.
  */
 static void
@@ -1352,8 +1353,8 @@ TransformSubqueryNode(MultiTable *subqueryNode,
 		BuildExtendedOpNodeProperties(extendedOpNode,
 									  subqueryHasNonDistributableAggregates);
 
-	MultiExtendedOp *masterExtendedOpNode =
-		MasterExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
+	MultiExtendedOp *coordinatorExtendedOpNode =
+		CoordinatorExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
 	MultiExtendedOp *workerExtendedOpNode =
 		WorkerExtendedOpNode(extendedOpNode, &extendedOpNodeProperties);
 
@@ -1399,8 +1400,8 @@ TransformSubqueryNode(MultiTable *subqueryNode,
 								  "are allowed in group by expression of subqueries")));
 	}
 
-	SetChild((MultiUnaryNode *) subqueryNode, (MultiNode *) masterExtendedOpNode);
-	SetChild((MultiUnaryNode *) masterExtendedOpNode, (MultiNode *) partitionNode);
+	SetChild((MultiUnaryNode *) subqueryNode, (MultiNode *) coordinatorExtendedOpNode);
+	SetChild((MultiUnaryNode *) coordinatorExtendedOpNode, (MultiNode *) partitionNode);
 	SetChild((MultiUnaryNode *) partitionNode, (MultiNode *) collectNode);
 	SetChild((MultiUnaryNode *) collectNode, (MultiNode *) workerExtendedOpNode);
 	SetChild((MultiUnaryNode *) workerExtendedOpNode, (MultiNode *) collectChildNode);
@@ -1408,7 +1409,7 @@ TransformSubqueryNode(MultiTable *subqueryNode,
 
 
 /*
- * MasterExtendedOpNode creates the master extended operator node from the given
+ * CoordinatorExtendedOpNode creates the coordinator extended operator node from the given
  * target entries. The function walks over these target entries; and for entries
  * with aggregates in them, this function calls the aggregate expression mutator
  * function.
@@ -1419,15 +1420,15 @@ TransformSubqueryNode(MultiTable *subqueryNode,
  * worker nodes' results.
  */
 static MultiExtendedOp *
-MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
-					 ExtendedOpNodeProperties *extendedOpNodeProperties)
+CoordinatorExtendedOpNode(MultiExtendedOp *originalOpNode,
+						  ExtendedOpNodeProperties *extendedOpNodeProperties)
 {
 	List *targetEntryList = originalOpNode->targetList;
 	List *newTargetEntryList = NIL;
 	List *newGroupClauseList = NIL;
 	Node *originalHavingQual = originalOpNode->havingQual;
 	Node *newHavingQual = NULL;
-	MasterAggregateWalkerContext walkerContext = {
+	CoordinatorAggregateWalkerContext walkerContext = {
 		.extendedOpNodeProperties = extendedOpNodeProperties,
 		.columnId = 1,
 	};
@@ -1446,7 +1447,7 @@ MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
 			 * The expression was entirely pushed down to worker.
 			 * We simply make it reference the output generated by worker nodes.
 			 */
-			Var *column = makeVarFromTargetEntry(masterTableId, originalTargetEntry);
+			Var *column = makeVarFromTargetEntry(combineTableId, originalTargetEntry);
 			column->varattno = walkerContext.columnId;
 			column->varattnosyn = walkerContext.columnId;
 			walkerContext.columnId++;
@@ -1460,8 +1461,8 @@ MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
 		}
 		else
 		{
-			Node *newNode = MasterAggregateMutator((Node *) originalExpression,
-												   &walkerContext);
+			Node *newNode = CoordinatorAggregateMutator((Node *) originalExpression,
+														&walkerContext);
 			newExpression = (Expr *) newNode;
 		}
 
@@ -1479,12 +1480,13 @@ MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
 
 		if (originalHavingQual != NULL)
 		{
-			newHavingQual = MasterAggregateMutator(originalHavingQual, &walkerContext);
+			newHavingQual = CoordinatorAggregateMutator(originalHavingQual,
+														&walkerContext);
 			if (IsA(newHavingQual, List))
 			{
 				/*
 				 * unflatten having qual to allow standard planner to work when transforming
-				 * the master query to a plan
+				 * the coordinator query to a plan
 				 */
 				newHavingQual = (Node *) make_ands_explicit(
 					castNode(List, newHavingQual));
@@ -1492,33 +1494,33 @@ MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
 		}
 	}
 
-	MultiExtendedOp *masterExtendedOpNode = CitusMakeNode(MultiExtendedOp);
-	masterExtendedOpNode->targetList = newTargetEntryList;
-	masterExtendedOpNode->groupClauseList = newGroupClauseList;
-	masterExtendedOpNode->sortClauseList = originalOpNode->sortClauseList;
-	masterExtendedOpNode->distinctClause = originalOpNode->distinctClause;
-	masterExtendedOpNode->hasDistinctOn = originalOpNode->hasDistinctOn;
-	masterExtendedOpNode->limitCount = originalOpNode->limitCount;
-	masterExtendedOpNode->limitOffset = originalOpNode->limitOffset;
+	MultiExtendedOp *coordinatorExtendedOpNode = CitusMakeNode(MultiExtendedOp);
+	coordinatorExtendedOpNode->targetList = newTargetEntryList;
+	coordinatorExtendedOpNode->groupClauseList = newGroupClauseList;
+	coordinatorExtendedOpNode->sortClauseList = originalOpNode->sortClauseList;
+	coordinatorExtendedOpNode->distinctClause = originalOpNode->distinctClause;
+	coordinatorExtendedOpNode->hasDistinctOn = originalOpNode->hasDistinctOn;
+	coordinatorExtendedOpNode->limitCount = originalOpNode->limitCount;
+	coordinatorExtendedOpNode->limitOffset = originalOpNode->limitOffset;
 #if PG_VERSION_NUM >= PG_VERSION_13
-	masterExtendedOpNode->limitOption = originalOpNode->limitOption;
+	coordinatorExtendedOpNode->limitOption = originalOpNode->limitOption;
 #endif
-	masterExtendedOpNode->havingQual = newHavingQual;
+	coordinatorExtendedOpNode->havingQual = newHavingQual;
 
 	if (!extendedOpNodeProperties->onlyPushableWindowFunctions)
 	{
-		masterExtendedOpNode->hasWindowFuncs = originalOpNode->hasWindowFuncs;
-		masterExtendedOpNode->windowClause = originalOpNode->windowClause;
-		masterExtendedOpNode->onlyPushableWindowFunctions = false;
+		coordinatorExtendedOpNode->hasWindowFuncs = originalOpNode->hasWindowFuncs;
+		coordinatorExtendedOpNode->windowClause = originalOpNode->windowClause;
+		coordinatorExtendedOpNode->onlyPushableWindowFunctions = false;
 	}
 
-	return masterExtendedOpNode;
+	return coordinatorExtendedOpNode;
 }
 
 
 /*
- * MasterAggregateMutator walks over the original target entry expression, and
- * creates the new expression tree to execute on the master node. The function
+ * CoordinatorAggregateMutator walks over the original target entry expression, and
+ * creates the new expression tree to execute on the coordinator node. The function
  * transforms aggregates, and copies columns; and recurses into the expression
  * mutator function for all other expression types.
  *
@@ -1528,7 +1530,8 @@ MasterExtendedOpNode(MultiExtendedOp *originalOpNode,
  * depth first order.
  */
 static Node *
-MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerContext)
+CoordinatorAggregateMutator(Node *originalNode,
+							CoordinatorAggregateWalkerContext *walkerContext)
 {
 	Node *newNode = NULL;
 	if (originalNode == NULL)
@@ -1546,7 +1549,7 @@ MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerC
 			 * The expression was entirely pushed down to worker.
 			 * We simply make it reference the output generated by worker nodes.
 			 */
-			Var *column = makeVar(masterTableId, walkerContext->columnId,
+			Var *column = makeVar(combineTableId, walkerContext->columnId,
 								  originalAggregate->aggtype,
 								  -1, originalAggregate->aggcollid, 0);
 			walkerContext->columnId++;
@@ -1560,8 +1563,8 @@ MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerC
 		}
 		else
 		{
-			Expr *newExpression = MasterAggregateExpression(originalAggregate,
-															walkerContext);
+			Expr *newExpression = CoordinatorAggregateExpression(originalAggregate,
+																 walkerContext);
 
 			newNode = (Node *) newExpression;
 		}
@@ -1569,7 +1572,7 @@ MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerC
 	else if (IsA(originalNode, Var))
 	{
 		Var *newColumn = copyObject((Var *) originalNode);
-		newColumn->varno = masterTableId;
+		newColumn->varno = combineTableId;
 		newColumn->varattno = walkerContext->columnId;
 		walkerContext->columnId++;
 
@@ -1577,7 +1580,7 @@ MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerC
 	}
 	else
 	{
-		newNode = expression_tree_mutator(originalNode, MasterAggregateMutator,
+		newNode = expression_tree_mutator(originalNode, CoordinatorAggregateMutator,
 										  (void *) walkerContext);
 	}
 
@@ -1586,23 +1589,23 @@ MasterAggregateMutator(Node *originalNode, MasterAggregateWalkerContext *walkerC
 
 
 /*
- * MasterAggregateExpression creates the master aggregate expression using the
+ * CoordinatorAggregateExpression creates the coordinator aggregate expression using the
  * original aggregate and aggregate's type information. This function handles
  * the average, count, array_agg, hll and topn aggregates separately due to
  * differences in these aggregate functions' transformations.
  *
  * Note that this function has implicit knowledge of the transformations applied
  * for worker nodes on the original aggregate. The function uses this implicit
- * knowledge to create the appropriate master function with correct data types.
+ * knowledge to create the appropriate coordinator function with correct data types.
  */
 static Expr *
-MasterAggregateExpression(Aggref *originalAggregate,
-						  MasterAggregateWalkerContext *walkerContext)
+CoordinatorAggregateExpression(Aggref *originalAggregate,
+							   CoordinatorAggregateWalkerContext *walkerContext)
 {
 	const Index columnLevelsUp = 0;  /* normal column */
 	const AttrNumber argumentId = 1; /* our aggregates have single arguments */
 	AggregateType aggregateType = GetAggregateType(originalAggregate);
-	Expr *newMasterExpression = NULL;
+	Expr *newCoordinatorExpression = NULL;
 
 	if (walkerContext->extendedOpNodeProperties->pullUpIntermediateRows)
 	{
@@ -1612,7 +1615,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		foreach_ptr(targetEntry, aggregate->args)
 		{
 			targetEntry->expr = (Expr *)
-								makeVar(masterTableId, walkerContext->columnId,
+								makeVar(combineTableId, walkerContext->columnId,
 										exprType((Node *) targetEntry->expr),
 										exprTypmod((Node *) targetEntry->expr),
 										exprCollation((Node *) targetEntry->expr),
@@ -1626,7 +1629,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		{
 			if (!IsA(directarg, Const) && !IsA(directarg, Param))
 			{
-				Var *var = makeVar(masterTableId, walkerContext->columnId,
+				Var *var = makeVar(combineTableId, walkerContext->columnId,
 								   exprType((Node *) directarg),
 								   exprTypmod((Node *) directarg),
 								   exprCollation((Node *) directarg),
@@ -1643,12 +1646,12 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		if (aggregate->aggfilter)
 		{
 			aggregate->aggfilter = (Expr *)
-								   makeVar(masterTableId, walkerContext->columnId,
+								   makeVar(combineTableId, walkerContext->columnId,
 										   BOOLOID, -1, InvalidOid, columnLevelsUp);
 			walkerContext->columnId++;
 		}
 
-		newMasterExpression = (Expr *) aggregate;
+		newCoordinatorExpression = (Expr *) aggregate;
 	}
 	else if (aggregateType == AGGREGATE_COUNT && originalAggregate->aggdistinct &&
 			 CountDistinctErrorRate == DISABLE_DISTINCT_APPROXIMATION &&
@@ -1685,8 +1688,8 @@ MasterAggregateExpression(Aggref *originalAggregate,
 				columnIndex++;
 			}
 
-			columnToUpdate->varno = masterTableId;
-			columnToUpdate->varnosyn = masterTableId;
+			columnToUpdate->varno = combineTableId;
+			columnToUpdate->varnosyn = combineTableId;
 			columnToUpdate->varattno = startColumnCount + columnIndex;
 			columnToUpdate->varattnosyn = startColumnCount + columnIndex;
 		}
@@ -1694,7 +1697,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		/* we added that many columns */
 		walkerContext->columnId += list_length(uniqueVarList);
 
-		newMasterExpression = (Expr *) aggregate;
+		newCoordinatorExpression = (Expr *) aggregate;
 	}
 	else if (aggregateType == AGGREGATE_COUNT && originalAggregate->aggdistinct &&
 			 CountDistinctErrorRate != DISABLE_DISTINCT_APPROXIMATION)
@@ -1702,7 +1705,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		/*
 		 * If enabled, we check for count(distinct) approximations before count
 		 * distincts. For this, we first compute hll_add_agg(hll_hash(column)) on
-		 * worker nodes, and get hll values. We then gather hlls on the master
+		 * worker nodes, and get hll values. We then gather hlls on the coordinator
 		 * node, and compute hll_cardinality(hll_union_agg(hll)).
 		 */
 		const int argCount = 1;
@@ -1722,7 +1725,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 
 		Oid hllType = TypeOid(hllSchemaOid, HLL_TYPE_NAME);
 		Oid hllTypeCollationId = get_typcollation(hllType);
-		Var *hllColumn = makeVar(masterTableId, walkerContext->columnId, hllType,
+		Var *hllColumn = makeVar(combineTableId, walkerContext->columnId, hllType,
 								 defaultTypeMod,
 								 hllTypeCollationId, columnLevelsUp);
 		walkerContext->columnId++;
@@ -1745,14 +1748,14 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		cardinalityExpression->funcresulttype = cardinalityReturnType;
 		cardinalityExpression->args = list_make1(unionAggregate);
 
-		newMasterExpression = (Expr *) cardinalityExpression;
+		newCoordinatorExpression = (Expr *) cardinalityExpression;
 	}
 	else if (aggregateType == AGGREGATE_AVERAGE)
 	{
 		/*
 		 * If the original aggregate is an average, we first compute sum(colum)
 		 * and count(column) on worker nodes. Then, we compute (sum(sum(column))
-		 * / sum(count(column))) on the master node.
+		 * / sum(count(column))) on the coordinator node.
 		 */
 		const char *sumAggregateName = AggregateNames[AGGREGATE_SUM];
 		const char *countAggregateName = AggregateNames[AGGREGATE_COUNT];
@@ -1767,15 +1770,15 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		Oid workerCountReturnType = get_func_rettype(countFunctionId);
 
 		/* create the expression sum(sum(column) / sum(count(column))) */
-		newMasterExpression = MasterAverageExpression(workerSumReturnType,
-													  workerCountReturnType,
-													  &(walkerContext->columnId));
+		newCoordinatorExpression = CoordinatorAverageExpression(workerSumReturnType,
+																workerCountReturnType,
+																&(walkerContext->columnId));
 	}
 	else if (aggregateType == AGGREGATE_COUNT)
 	{
 		/*
 		 * Count aggregates are handled in two steps. First, worker nodes report
-		 * their count results. Then, the master node sums up these results.
+		 * their count results. Then, the coordinator node sums up these results.
 		 */
 
 		/* worker aggregate and original aggregate have the same return type */
@@ -1785,30 +1788,31 @@ MasterAggregateExpression(Aggref *originalAggregate,
 
 		const char *sumAggregateName = AggregateNames[AGGREGATE_SUM];
 		Oid sumFunctionId = AggregateFunctionOid(sumAggregateName, workerReturnType);
-		Oid masterReturnType = get_func_rettype(sumFunctionId);
+		Oid coordinatorReturnType = get_func_rettype(sumFunctionId);
 
-		Aggref *newMasterAggregate = copyObject(originalAggregate);
-		newMasterAggregate->aggstar = false;
-		newMasterAggregate->aggdistinct = NULL;
-		newMasterAggregate->aggfnoid = sumFunctionId;
-		newMasterAggregate->aggtype = masterReturnType;
-		newMasterAggregate->aggfilter = NULL;
-		newMasterAggregate->aggtranstype = InvalidOid;
-		newMasterAggregate->aggargtypes = list_make1_oid(newMasterAggregate->aggtype);
-		newMasterAggregate->aggsplit = AGGSPLIT_SIMPLE;
+		Aggref *newCoordinatorAggregate = copyObject(originalAggregate);
+		newCoordinatorAggregate->aggstar = false;
+		newCoordinatorAggregate->aggdistinct = NULL;
+		newCoordinatorAggregate->aggfnoid = sumFunctionId;
+		newCoordinatorAggregate->aggtype = coordinatorReturnType;
+		newCoordinatorAggregate->aggfilter = NULL;
+		newCoordinatorAggregate->aggtranstype = InvalidOid;
+		newCoordinatorAggregate->aggargtypes = list_make1_oid(
+			newCoordinatorAggregate->aggtype);
+		newCoordinatorAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		Var *column = makeVar(masterTableId, walkerContext->columnId, workerReturnType,
+		Var *column = makeVar(combineTableId, walkerContext->columnId, workerReturnType,
 							  workerReturnTypeMod, workerCollationId, columnLevelsUp);
 		walkerContext->columnId++;
 
 		/* aggref expects its arguments to be wrapped in target entries */
 		TargetEntry *columnTargetEntry = makeTargetEntry((Expr *) column, argumentId,
 														 NULL, false);
-		newMasterAggregate->args = list_make1(columnTargetEntry);
+		newCoordinatorAggregate->args = list_make1(columnTargetEntry);
 
 		/* cast numeric sum result to bigint (count's return type) */
 		CoerceViaIO *coerceExpr = makeNode(CoerceViaIO);
-		coerceExpr->arg = (Expr *) newMasterAggregate;
+		coerceExpr->arg = (Expr *) newCoordinatorAggregate;
 		coerceExpr->resulttype = INT8OID;
 		coerceExpr->resultcollid = InvalidOid;
 		coerceExpr->coerceformat = COERCE_IMPLICIT_CAST;
@@ -1824,7 +1828,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		coalesceExpr->args = coalesceArgs;
 		coalesceExpr->location = -1;
 
-		newMasterExpression = (Expr *) coalesceExpr;
+		newCoordinatorExpression = (Expr *) coalesceExpr;
 	}
 	else if (aggregateType == AGGREGATE_ARRAY_AGG ||
 			 aggregateType == AGGREGATE_JSONB_AGG ||
@@ -1835,7 +1839,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		/*
 		 * Array and json aggregates are handled in two steps. First, we compute
 		 * array_agg() or json aggregate on the worker nodes. Then, we gather
-		 * the arrays or jsons on the master and compute the array_cat_agg()
+		 * the arrays or jsons on the coordinator and compute the array_cat_agg()
 		 * or jsonb_cat_agg() aggregate on them to get the final array or json.
 		 */
 		const char *catAggregateName = NULL;
@@ -1878,29 +1882,29 @@ MasterAggregateExpression(Aggref *originalAggregate,
 													   catInputType);
 
 		/* create argument for the array_cat_agg() or jsonb_cat_agg() aggregate */
-		Var *column = makeVar(masterTableId, walkerContext->columnId, workerReturnType,
+		Var *column = makeVar(combineTableId, walkerContext->columnId, workerReturnType,
 							  workerReturnTypeMod, workerCollationId, columnLevelsUp);
 		TargetEntry *catAggArgument = makeTargetEntry((Expr *) column, argumentId, NULL,
 													  false);
 		walkerContext->columnId++;
 
-		/* construct the master array_cat_agg() or jsonb_cat_agg() expression */
-		Aggref *newMasterAggregate = copyObject(originalAggregate);
-		newMasterAggregate->aggfnoid = aggregateFunctionId;
-		newMasterAggregate->args = list_make1(catAggArgument);
-		newMasterAggregate->aggfilter = NULL;
-		newMasterAggregate->aggtranstype = InvalidOid;
-		newMasterAggregate->aggargtypes = list_make1_oid(ANYARRAYOID);
-		newMasterAggregate->aggsplit = AGGSPLIT_SIMPLE;
+		/* construct the coordinator array_cat_agg() or jsonb_cat_agg() expression */
+		Aggref *newCoordinatorAggregate = copyObject(originalAggregate);
+		newCoordinatorAggregate->aggfnoid = aggregateFunctionId;
+		newCoordinatorAggregate->args = list_make1(catAggArgument);
+		newCoordinatorAggregate->aggfilter = NULL;
+		newCoordinatorAggregate->aggtranstype = InvalidOid;
+		newCoordinatorAggregate->aggargtypes = list_make1_oid(ANYARRAYOID);
+		newCoordinatorAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) newMasterAggregate;
+		newCoordinatorExpression = (Expr *) newCoordinatorAggregate;
 	}
 	else if (aggregateType == AGGREGATE_HLL_ADD ||
 			 aggregateType == AGGREGATE_HLL_UNION)
 	{
 		/*
 		 * If hll aggregates are called, we simply create the hll_union_aggregate
-		 * to apply in the master after running the original aggregate in
+		 * to apply in the coordinator after running the original aggregate in
 		 * workers.
 		 */
 
@@ -1909,7 +1913,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		int32 hllReturnTypeMod = exprTypmod((Node *) originalAggregate);
 		Oid hllTypeCollationId = exprCollation((Node *) originalAggregate);
 
-		Var *hllColumn = makeVar(masterTableId, walkerContext->columnId, hllType,
+		Var *hllColumn = makeVar(combineTableId, walkerContext->columnId, hllType,
 								 hllReturnTypeMod, hllTypeCollationId, columnLevelsUp);
 		walkerContext->columnId++;
 
@@ -1926,7 +1930,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		unionAggregate->aggargtypes = list_make1_oid(hllType);
 		unionAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) unionAggregate;
+		newCoordinatorExpression = (Expr *) unionAggregate;
 	}
 	else if (aggregateType == AGGREGATE_TOPN_UNION_AGG ||
 			 aggregateType == AGGREGATE_TOPN_ADD_AGG)
@@ -1934,7 +1938,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		/*
 		 * Top-N aggregates are handled in two steps. First, we compute
 		 * topn_add_agg() or topn_union_agg() aggregates on the worker nodes.
-		 * Then, we gather the Top-Ns on the master and take the union of all
+		 * Then, we gather the Top-Ns on the coordinator and take the union of all
 		 * to get the final topn.
 		 */
 
@@ -1946,14 +1950,14 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		Oid topnTypeCollationId = exprCollation((Node *) originalAggregate);
 
 		/* create argument for the topn_union_agg() aggregate */
-		Var *topnColumn = makeVar(masterTableId, walkerContext->columnId, topnType,
+		Var *topnColumn = makeVar(combineTableId, walkerContext->columnId, topnType,
 								  topnReturnTypeMod, topnTypeCollationId, columnLevelsUp);
 		walkerContext->columnId++;
 
 		TargetEntry *topNTargetEntry = makeTargetEntry((Expr *) topnColumn, argumentId,
 													   NULL, false);
 
-		/* construct the master topn_union_agg() expression */
+		/* construct the coordinator topn_union_agg() expression */
 		Aggref *unionAggregate = makeNode(Aggref);
 		unionAggregate->aggfnoid = unionFunctionId;
 		unionAggregate->aggtype = topnType;
@@ -1964,7 +1968,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		unionAggregate->aggargtypes = list_make1_oid(topnType);
 		unionAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) unionAggregate;
+		newCoordinatorExpression = (Expr *) unionAggregate;
 	}
 	else if (aggregateType == AGGREGATE_TDIGEST_COMBINE ||
 			 aggregateType == AGGREGATE_TDIGEST_ADD_DOUBLE)
@@ -1977,7 +1981,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		Oid tdigestTypeCollationId = exprCollation((Node *) originalAggregate);
 
 		/* create first argument for tdigest_precentile(tdigest, double) */
-		Var *tdigestColumn = makeVar(masterTableId, walkerContext->columnId, tdigestType,
+		Var *tdigestColumn = makeVar(combineTableId, walkerContext->columnId, tdigestType,
 									 tdigestReturnTypeMod, tdigestTypeCollationId,
 									 columnLevelsUp);
 		TargetEntry *tdigestTargetEntry = makeTargetEntry((Expr *) tdigestColumn,
@@ -1985,7 +1989,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 														  NULL, false);
 		walkerContext->columnId++;
 
-		/* construct the master tdigest(tdigest) expression */
+		/* construct the coordinator tdigest(tdigest) expression */
 		Aggref *unionAggregate = makeNode(Aggref);
 		unionAggregate->aggfnoid = unionFunctionId;
 		unionAggregate->aggtype = originalAggregate->aggtype;
@@ -1996,7 +2000,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		unionAggregate->aggargtypes = list_make1_oid(tdigestType);
 		unionAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) unionAggregate;
+		newCoordinatorExpression = (Expr *) unionAggregate;
 	}
 	else if (aggregateType == AGGREGATE_TDIGEST_PERCENTILE_ADD_DOUBLE ||
 			 aggregateType == AGGREGATE_TDIGEST_PERCENTILE_ADD_DOUBLEARRAY ||
@@ -2028,14 +2032,14 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		Oid tdigestTypeCollationId = exprCollation((Node *) originalAggregate);
 
 		/* create first argument for tdigest_precentile(tdigest, double) */
-		Var *tdigestColumn = makeVar(masterTableId, walkerContext->columnId, tdigestType,
+		Var *tdigestColumn = makeVar(combineTableId, walkerContext->columnId, tdigestType,
 									 tdigestReturnTypeMod, tdigestTypeCollationId,
 									 columnLevelsUp);
 		TargetEntry *tdigestTargetEntry = makeTargetEntry((Expr *) tdigestColumn,
 														  argumentId, NULL, false);
 		walkerContext->columnId++;
 
-		/* construct the master tdigest_precentile(tdigest, double) expression */
+		/* construct the coordinator tdigest_precentile(tdigest, double) expression */
 		Aggref *unionAggregate = makeNode(Aggref);
 		unionAggregate->aggfnoid = unionFunctionId;
 		unionAggregate->aggtype = originalAggregate->aggtype;
@@ -2050,7 +2054,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 			list_nth_oid(originalAggregate->aggargtypes, 2));
 		unionAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) unionAggregate;
+		newCoordinatorExpression = (Expr *) unionAggregate;
 	}
 	else if (aggregateType == AGGREGATE_TDIGEST_PERCENTILE_TDIGEST_DOUBLE ||
 			 aggregateType == AGGREGATE_TDIGEST_PERCENTILE_TDIGEST_DOUBLEARRAY ||
@@ -2067,14 +2071,14 @@ MasterAggregateExpression(Aggref *originalAggregate,
 		Oid tdigestTypeCollationId = exprCollation((Node *) originalAggregate);
 
 		/* create first argument for tdigest_precentile(tdigest, double) */
-		Var *tdigestColumn = makeVar(masterTableId, walkerContext->columnId, tdigestType,
+		Var *tdigestColumn = makeVar(combineTableId, walkerContext->columnId, tdigestType,
 									 tdigestReturnTypeMod, tdigestTypeCollationId,
 									 columnLevelsUp);
 		TargetEntry *tdigestTargetEntry = makeTargetEntry((Expr *) tdigestColumn,
 														  argumentId, NULL, false);
 		walkerContext->columnId++;
 
-		/* construct the master tdigest_precentile(tdigest, double) expression */
+		/* construct the coordinator tdigest_precentile(tdigest, double) expression */
 		Aggref *unionAggregate = makeNode(Aggref);
 		unionAggregate->aggfnoid = unionFunctionId;
 		unionAggregate->aggtype = originalAggregate->aggtype;
@@ -2089,7 +2093,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 			list_nth_oid(originalAggregate->aggargtypes, 1));
 		unionAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-		newMasterExpression = (Expr *) unionAggregate;
+		newCoordinatorExpression = (Expr *) unionAggregate;
 	}
 	else if (aggregateType == AGGREGATE_CUSTOM_COMBINE)
 	{
@@ -2122,7 +2126,7 @@ MasterAggregateExpression(Aggref *originalAggregate,
 			Const *aggOidParam = makeConst(OIDOID, -1, InvalidOid, sizeof(Oid),
 										   ObjectIdGetDatum(originalAggregate->aggfnoid),
 										   false, true);
-			Var *column = makeVar(masterTableId, walkerContext->columnId,
+			Var *column = makeVar(combineTableId, walkerContext->columnId,
 								  workerReturnType,
 								  workerReturnTypeMod, workerCollationId, columnLevelsUp);
 			walkerContext->columnId++;
@@ -2134,18 +2138,18 @@ MasterAggregateExpression(Aggref *originalAggregate,
 						   makeTargetEntry((Expr *) nullTag, 3, NULL, false));
 
 			/* coord_combine_agg(agg, workercol) */
-			Aggref *newMasterAggregate = makeNode(Aggref);
-			newMasterAggregate->aggfnoid = coordCombineId;
-			newMasterAggregate->aggtype = originalAggregate->aggtype;
-			newMasterAggregate->args = aggArguments;
-			newMasterAggregate->aggkind = AGGKIND_NORMAL;
-			newMasterAggregate->aggfilter = NULL;
-			newMasterAggregate->aggtranstype = INTERNALOID;
-			newMasterAggregate->aggargtypes = list_make3_oid(OIDOID, CSTRINGOID,
-															 resultType);
-			newMasterAggregate->aggsplit = AGGSPLIT_SIMPLE;
+			Aggref *newCoordinatorAggregate = makeNode(Aggref);
+			newCoordinatorAggregate->aggfnoid = coordCombineId;
+			newCoordinatorAggregate->aggtype = originalAggregate->aggtype;
+			newCoordinatorAggregate->args = aggArguments;
+			newCoordinatorAggregate->aggkind = AGGKIND_NORMAL;
+			newCoordinatorAggregate->aggfilter = NULL;
+			newCoordinatorAggregate->aggtranstype = INTERNALOID;
+			newCoordinatorAggregate->aggargtypes = list_make3_oid(OIDOID, CSTRINGOID,
+																  resultType);
+			newCoordinatorAggregate->aggsplit = AGGSPLIT_SIMPLE;
 
-			newMasterExpression = (Expr *) newMasterAggregate;
+			newCoordinatorExpression = (Expr *) newCoordinatorAggregate;
 		}
 		else
 		{
@@ -2166,37 +2170,37 @@ MasterAggregateExpression(Aggref *originalAggregate,
 
 		const char *aggregateName = AggregateNames[aggregateType];
 		Oid aggregateFunctionId = AggregateFunctionOid(aggregateName, workerReturnType);
-		Oid masterReturnType = get_func_rettype(aggregateFunctionId);
+		Oid coordinatorReturnType = get_func_rettype(aggregateFunctionId);
 
-		Aggref *newMasterAggregate = copyObject(originalAggregate);
-		newMasterAggregate->aggdistinct = NULL;
-		newMasterAggregate->aggfnoid = aggregateFunctionId;
-		newMasterAggregate->aggtype = masterReturnType;
-		newMasterAggregate->aggfilter = NULL;
+		Aggref *newCoordinatorAggregate = copyObject(originalAggregate);
+		newCoordinatorAggregate->aggdistinct = NULL;
+		newCoordinatorAggregate->aggfnoid = aggregateFunctionId;
+		newCoordinatorAggregate->aggtype = coordinatorReturnType;
+		newCoordinatorAggregate->aggfilter = NULL;
 
 		/*
 		 * If return type aggregate is anyelement, its actual return type is
 		 * determined on the type of its argument. So we replace it with the
 		 * argument type in that case.
 		 */
-		if (masterReturnType == ANYELEMENTOID)
+		if (coordinatorReturnType == ANYELEMENTOID)
 		{
-			newMasterAggregate->aggtype = workerReturnType;
+			newCoordinatorAggregate->aggtype = workerReturnType;
 
 			Expr *firstArg = FirstAggregateArgument(originalAggregate);
-			newMasterAggregate->aggcollid = exprCollation((Node *) firstArg);
+			newCoordinatorAggregate->aggcollid = exprCollation((Node *) firstArg);
 		}
 
-		Var *column = makeVar(masterTableId, walkerContext->columnId, workerReturnType,
+		Var *column = makeVar(combineTableId, walkerContext->columnId, workerReturnType,
 							  workerReturnTypeMod, workerCollationId, columnLevelsUp);
 		walkerContext->columnId++;
 
 		/* aggref expects its arguments to be wrapped in target entries */
 		TargetEntry *columnTargetEntry = makeTargetEntry((Expr *) column, argumentId,
 														 NULL, false);
-		newMasterAggregate->args = list_make1(columnTargetEntry);
+		newCoordinatorAggregate->args = list_make1(columnTargetEntry);
 
-		newMasterExpression = (Expr *) newMasterAggregate;
+		newCoordinatorExpression = (Expr *) newCoordinatorAggregate;
 	}
 
 
@@ -2207,25 +2211,25 @@ MasterAggregateExpression(Aggref *originalAggregate,
 	 * and grouping have already been chosen based on the original type.
 	 */
 	Expr *typeConvertedExpression = AddTypeConversion((Node *) originalAggregate,
-													  (Node *) newMasterExpression);
+													  (Node *) newCoordinatorExpression);
 	if (typeConvertedExpression != NULL)
 	{
-		newMasterExpression = typeConvertedExpression;
+		newCoordinatorExpression = typeConvertedExpression;
 	}
 
-	return newMasterExpression;
+	return newCoordinatorExpression;
 }
 
 
 /*
- * MasterAverageExpression creates an expression of the form (sum(column1) /
+ * CoordinatorAverageExpression creates an expression of the form (sum(column1) /
  * sum(column2)), where column1 is the sum of the original value, and column2 is
  * the count of that value. This expression allows us to evaluate the average
  * function over distributed data.
  */
 static Expr *
-MasterAverageExpression(Oid sumAggregateType, Oid countAggregateType,
-						AttrNumber *columnId)
+CoordinatorAverageExpression(Oid sumAggregateType, Oid countAggregateType,
+							 AttrNumber *columnId)
 {
 	const char *sumAggregateName = AggregateNames[AGGREGATE_SUM];
 	const int32 defaultTypeMod = -1;
@@ -2236,7 +2240,7 @@ MasterAverageExpression(Oid sumAggregateType, Oid countAggregateType,
 	Oid countTypeCollationId = get_typcollation(countAggregateType);
 
 	/* create the first argument for sum(column1) */
-	Var *firstColumn = makeVar(masterTableId, (*columnId), sumAggregateType,
+	Var *firstColumn = makeVar(combineTableId, (*columnId), sumAggregateType,
 							   defaultTypeMod, sumTypeCollationId, defaultLevelsUp);
 	TargetEntry *firstTargetEntry = makeTargetEntry((Expr *) firstColumn, argumentId,
 													NULL, false);
@@ -2252,7 +2256,7 @@ MasterAverageExpression(Oid sumAggregateType, Oid countAggregateType,
 	firstSum->aggsplit = AGGSPLIT_SIMPLE;
 
 	/* create the second argument for sum(column2) */
-	Var *secondColumn = makeVar(masterTableId, (*columnId), countAggregateType,
+	Var *secondColumn = makeVar(combineTableId, (*columnId), countAggregateType,
 								defaultTypeMod, countTypeCollationId, defaultLevelsUp);
 	TargetEntry *secondTargetEntry = makeTargetEntry((Expr *) secondColumn, argumentId,
 													 NULL, false);
@@ -2365,7 +2369,7 @@ WorkerExtendedOpNode(MultiExtendedOp *originalOpNode,
 	/*
 	 * For the purpose of this variable, not pushing down when there are no groups
 	 * is pushing down the original grouping, ie the worker's GROUP BY matches
-	 * the master's GROUP BY.
+	 * the coordinator's GROUP BY.
 	 */
 	bool pushingDownOriginalGrouping =
 		list_length(queryGroupClause.groupClauseList) == originalGroupClauseLength;
@@ -2663,7 +2667,7 @@ ProcessDistinctClauseForWorkerQuery(List *distinctClause, bool hasDistinctOn,
 
 	/*
 	 * Distinct is pushed down to worker query only if the query does not
-	 * contain an aggregate in which master processing might be required to
+	 * contain an aggregate in which coordinator processing might be required to
 	 * complete the final result before distinct operation. We also prevent
 	 * distinct pushdown if distinct clause is missing some entries that
 	 * group by clause has.
@@ -2761,7 +2765,7 @@ ProcessWindowFunctionPullUpForWorkerQuery(List *windowClause,
 			newTargetEntry->resname =
 				WorkerColumnName(queryTargetList->targetProjectionNumber);
 
-			/* force resjunk to false as we may need this on the master */
+			/* force resjunk to false as we may need this on the coordinator */
 			newTargetEntry->resjunk = false;
 			newTargetEntry->resno = queryTargetList->targetProjectionNumber;
 
@@ -2986,7 +2990,7 @@ GenerateWorkerTargetEntry(TargetEntry *targetEntry, Expr *workerExpression,
 	/* we can't generate a target entry without an expression */
 	Assert(workerExpression != NULL);
 
-	/* force resjunk to false as we may need this on the master */
+	/* force resjunk to false as we may need this on the coordinator */
 	newTargetEntry->expr = workerExpression;
 	newTargetEntry->resjunk = false;
 	newTargetEntry->resno = targetProjectionNumber;

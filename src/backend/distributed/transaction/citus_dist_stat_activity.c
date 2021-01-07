@@ -197,8 +197,8 @@ typedef struct CitusDistStat
 	text *query_host_name;
 	int query_host_port;
 
-	text *master_query_host_name;
-	int master_query_host_port;
+	text *coordinator_query_host_name;
+	int coordinator_query_host_port;
 	uint64 distributed_transaction_number;
 	TimestampTz distributed_transaction_stamp;
 
@@ -543,24 +543,26 @@ ReplaceInitiatorNodeIdentifier(int initiator_node_identifier,
 			ereport(ERROR, (errmsg("no primary node found for group %d",
 								   initiator_node_identifier)));
 		}
-		citusDistStat->master_query_host_name =
+		citusDistStat->coordinator_query_host_name =
 			cstring_to_text(initiatorWorkerNode->workerName);
-		citusDistStat->master_query_host_port = initiatorWorkerNode->workerPort;
+		citusDistStat->coordinator_query_host_port = initiatorWorkerNode->workerPort;
 	}
 	else if (initiator_node_identifier == 0 && IsCoordinator())
 	{
-		citusDistStat->master_query_host_name = cstring_to_text(coordinator_host_name);
-		citusDistStat->master_query_host_port = PostPortNumber;
+		citusDistStat->coordinator_query_host_name = cstring_to_text(
+			coordinator_host_name);
+		citusDistStat->coordinator_query_host_port = PostPortNumber;
 	}
 	else if (initiator_node_identifier == 0)
 	{
-		citusDistStat->master_query_host_name = cstring_to_text(coordinator_host_name);
-		citusDistStat->master_query_host_port = 0;
+		citusDistStat->coordinator_query_host_name = cstring_to_text(
+			coordinator_host_name);
+		citusDistStat->coordinator_query_host_port = 0;
 	}
 	else
 	{
-		citusDistStat->master_query_host_name = NULL;
-		citusDistStat->master_query_host_port = 0;
+		citusDistStat->coordinator_query_host_name = NULL;
+		citusDistStat->coordinator_query_host_port = 0;
 	}
 }
 
@@ -926,16 +928,16 @@ ReturnCitusDistStats(List *citusStatsList, FunctionCallInfo fcinfo)
 
 		values[1] = Int32GetDatum(citusDistStat->query_host_port);
 
-		if (citusDistStat->master_query_host_name != NULL)
+		if (citusDistStat->coordinator_query_host_name != NULL)
 		{
-			values[2] = PointerGetDatum(citusDistStat->master_query_host_name);
+			values[2] = PointerGetDatum(citusDistStat->coordinator_query_host_name);
 		}
 		else
 		{
 			nulls[2] = true;
 		}
 
-		values[3] = Int32GetDatum(citusDistStat->master_query_host_port);
+		values[3] = Int32GetDatum(citusDistStat->coordinator_query_host_port);
 		values[4] = UInt64GetDatum(citusDistStat->distributed_transaction_number);
 
 		if (citusDistStat->distributed_transaction_stamp != DT_NOBEGIN)

@@ -402,7 +402,7 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 	if (distPlan->combineQuery == NULL)
 	{
 		/*
-		 * For router queries, we construct a synthetic master query that simply passes
+		 * For router queries, we construct a synthetic combine query that simply passes
 		 * on the results of the remote tasks, which we can then use as the select in
 		 * the INSERT .. SELECT.
 		 */
@@ -417,7 +417,7 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 	 * from the workers. And making the resulting insert query the combineQuery
 	 * let's us execute this insert command.
 	 *
-	 * So this operation makes the master query insert the result of the
+	 * So this operation makes the combine query insert the result of the
 	 * distributed select instead of returning it.
 	 */
 	selectRte->subquery = distPlan->combineQuery;
@@ -497,13 +497,13 @@ CreateCombineQueryForRouterPlan(DistributedPlan *distPlan)
 
 /*
  * CreateTargetListForCombineQuery is used for creating a target list for
- * master query.
+ * combine query.
  */
 static List *
 CreateTargetListForCombineQuery(List *targetList)
 {
 	List *newTargetEntryList = NIL;
-	const uint32 masterTableId = 1;
+	const uint32 combineTableId = 1;
 	int columnId = 1;
 
 	/* iterate over original target entries */
@@ -512,7 +512,7 @@ CreateTargetListForCombineQuery(List *targetList)
 	{
 		TargetEntry *newTargetEntry = flatCopyTargetEntry(originalTargetEntry);
 
-		Var *column = makeVarFromTargetEntry(masterTableId, originalTargetEntry);
+		Var *column = makeVarFromTargetEntry(combineTableId, originalTargetEntry);
 		column->varattno = columnId;
 		column->varattnosyn = columnId;
 		columnId++;

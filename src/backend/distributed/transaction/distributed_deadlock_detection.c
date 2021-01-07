@@ -111,7 +111,7 @@ CheckForDistributedDeadlocks(void)
 	/*
 	 * We don't need to do any distributed deadlock checking if there
 	 * are no worker nodes. This might even be problematic for a non-mx
-	 * worker node which has the same group id with its master (i.e., 0),
+	 * worker node which has the same group id with its coordinator (i.e., 0),
 	 * which may erroneously decide to kill the deadlocks happening on it.
 	 */
 	if (list_length(workerNodeList) == 0)

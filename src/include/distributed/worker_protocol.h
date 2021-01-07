@@ -30,7 +30,6 @@
 
 /* Directory, file, table name, and UDF related defines for distributed tasks */
 #define PG_JOB_CACHE_DIR "pgsql_job_cache"
-#define MASTER_JOB_DIRECTORY_PREFIX "master_job_"
 #define JOB_DIRECTORY_PREFIX "job_"
 #define JOB_SCHEMA_PREFIX "pg_merge_job_"
 #define TASK_FILE_PREFIX "task_"
@@ -54,7 +53,6 @@
 #define COPY_IN_COMMAND "COPY %s FROM '%s'"
 
 /* Defines that relate to creating tables */
-#define GET_TABLE_DDL_EVENTS "SELECT master_get_table_ddl_events('%s')"
 #define SET_SEARCH_PATH_COMMAND "SET search_path TO %s"
 #define CREATE_TABLE_COMMAND "CREATE TABLE %s (%s)"
 #define CREATE_TABLE_AS_COMMAND "CREATE TABLE %s (%s) AS (%s)"
@@ -125,7 +123,7 @@ extern uint64 ExtractShardIdFromTableName(const char *tableName, bool missingOk)
 extern void RepartitionCleanupJobDirectories(void);
 
 
-/* Function declarations shared with the master planner */
+/* Function declarations shared with the combine planner */
 extern StringInfo TaskFilename(StringInfo directoryName, uint32 taskId);
 extern StringInfo UserTaskFilename(StringInfo directoryName, uint32 taskId);
 extern List * ColumnDefinitionList(List *columnNameList, List *columnTypeList);

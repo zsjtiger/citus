@@ -340,7 +340,7 @@ PostprocessAlterTableSchemaStmt(Node *node, const char *queryString)
  * PreprocessAlterTableStmt determines whether a given ALTER TABLE statement
  * involves a distributed table. If so (and if the statement does not use
  * unsupported options), it modifies the input statement to ensure proper
- * execution against the master node table and creates a DDLJob to encapsulate
+ * execution against the coordinator node table and creates a DDLJob to encapsulate
  * information needed during the worker node portion of DDL execution before
  * returning that DDLJob in a List. If no distributed table is involved, this
  * function returns NIL.
@@ -415,7 +415,7 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 	 * We check if there is a ADD/DROP FOREIGN CONSTRAINT command in sub commands
 	 * list. If there is we assign referenced relation id to rightRelationId and
 	 * we also set skip_validation to true to prevent PostgreSQL to verify validity
-	 * of the foreign constraint in master. Validity will be checked in workers
+	 * of the foreign constraint in coordinator. Validity will be checked in workers
 	 * anyway.
 	 */
 	List *commandList = alterTableStatement->cmds;
@@ -803,7 +803,7 @@ WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
 	 * We check if there is a ADD FOREIGN CONSTRAINT command in sub commands list.
 	 * If there is we assign referenced releation id to rightRelationId and we also
 	 * set skip_validation to true to prevent PostgreSQL to verify validity of the
-	 * foreign constraint in master. Validity will be checked in workers anyway.
+	 * foreign constraint in coordinator. Validity will be checked in workers anyway.
 	 */
 	List *commandList = alterTableStatement->cmds;
 	AlterTableCmd *command = NULL;
@@ -906,7 +906,7 @@ ErrorIfAlterDropsPartitionColumn(AlterTableStmt *alterTableStatement)
 
 /*
  * PostprocessAlterTableStmt runs after the ALTER TABLE command has already run
- * on the master, so we are checking constraints over the table with constraints
+ * on the coordinator, so we are checking constraints over the table with constraints
  * already defined (to make the constraint check process same for ALTER TABLE and
  * CREATE TABLE). If constraints do not fulfill the rules we defined, they will be
  * removed and the table will return back to the state before the ALTER TABLE command.
