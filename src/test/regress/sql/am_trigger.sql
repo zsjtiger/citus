@@ -61,6 +61,27 @@ insert into test_tr values(2),(3),(4);
 SELECT * FROM test_tr ORDER BY i;
 
 drop table test_tr;
+
+--
+-- test implicit triggers created by foreign keys or partitions of a
+-- table with a trigger
+--
+
+create table test_tr_referenced(i int primary key);
+-- should fail when creating FK trigger
+create table test_tr_referencing(j int references test_tr_referenced(i)) using columnar;
+drop table test_tr_referenced;
+
+create table test_tr_p(i int) partition by range(i);
+create trigger test_tr_p_tr after update on test_tr_p
+  for each row execute procedure trr_after();
+create table test_tr_p0 partition of test_tr_p
+  for values from (0) to (10);
+-- columnar partition should fail
+create table test_tr_p1 partition of test_tr_p
+  for values from (10) to (20) using columnar;
+drop table test_tr_p;
+
 create table test_tr(i int) using columnar;
 
 -- we should be able to clean-up and continue gracefully if we
