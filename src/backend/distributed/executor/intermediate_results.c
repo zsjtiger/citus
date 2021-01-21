@@ -8,40 +8,20 @@
  *-------------------------------------------------------------------------
  */
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include "postgres.h"
-#include "funcapi.h"
-#include "libpq-fe.h"
-#include "miscadmin.h"
 #include "pgstat.h"
 
-#include "catalog/pg_enum.h"
-#include "commands/copy.h"
-#include "distributed/commands/multi_copy.h"
-#include "distributed/connection_management.h"
 #include "distributed/error_codes.h"
 #include "distributed/intermediate_results.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_utility.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/multi_client_executor.h"
 #include "distributed/multi_executor.h"
 #include "distributed/remote_commands.h"
 #include "distributed/transmit.h"
 #include "distributed/transaction_identifier.h"
 #include "distributed/tuplestore.h"
-#include "distributed/version_compat.h"
 #include "distributed/worker_protocol.h"
-#include "nodes/makefuncs.h"
-#include "nodes/parsenodes.h"
-#include "nodes/primnodes.h"
-#include "storage/fd.h"
-#include "tcop/tcopprot.h"
-#include "utils/builtins.h"
-#include "utils/lsyscache.h"
-#include "utils/memutils.h"
-#include "utils/syscache.h"
 
 
 static bool CreatedResultsDirectory = false;

@@ -6,11 +6,8 @@
  */
 
 #include "postgres.h"
-#include "utils/memutils.h"
 
-#include "distributed/citus_nodes.h"
 #include "distributed/errormessage.h"
-#include "distributed/log_utils.h"
 
 /*
  * DeferredErrorInternal is a helper function for DeferredError().

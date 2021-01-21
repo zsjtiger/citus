@@ -10,24 +10,15 @@
 
 #include "postgres.h"
 
-#include "libpq-fe.h"
 
 #include "miscadmin.h"
 
-#include "access/xact.h"
-#include "distributed/backend_data.h"
-#include "distributed/citus_safe_lib.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
 #include "distributed/metadata_cache.h"
 #include "distributed/remote_commands.h"
-#include "distributed/remote_transaction.h"
 #include "distributed/transaction_identifier.h"
-#include "distributed/transaction_management.h"
 #include "distributed/transaction_recovery.h"
-#include "distributed/worker_manager.h"
 #include "utils/builtins.h"
-#include "utils/hsearch.h"
 
 
 #define PREPARED_TRANSACTION_NAME_FORMAT "citus_%u_%u_"UINT64_FORMAT "_%u"

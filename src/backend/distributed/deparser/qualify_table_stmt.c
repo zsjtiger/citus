@@ -19,10 +19,7 @@
 #include "postgres.h"
 
 #include "catalog/namespace.h"
-#include "nodes/parsenodes.h"
 #include "utils/lsyscache.h"
-#include "utils/rel.h"
-#include "utils/relcache.h"
 #include "distributed/deparser.h"
 
 void

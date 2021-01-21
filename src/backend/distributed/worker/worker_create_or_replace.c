@@ -9,17 +9,8 @@
 
 #include "postgres.h"
 
-#include "access/htup_details.h"
 #include "catalog/dependency.h"
 #include "catalog/pg_collation.h"
-#include "catalog/pg_proc.h"
-#include "catalog/pg_type.h"
-#include "fmgr.h"
-#include "nodes/makefuncs.h"
-#include "nodes/nodes.h"
-#include "parser/parse_type.h"
-#include "tcop/dest.h"
-#include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"

@@ -11,7 +11,6 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 #include "distributed/deparser.h"
 #include "distributed/multi_executor.h"

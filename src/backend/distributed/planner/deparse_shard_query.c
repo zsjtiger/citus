@@ -10,32 +10,18 @@
  */
 
 #include "postgres.h"
-#include "c.h"
 
-#include "access/heapam.h"
-#include "access/htup_details.h"
 #include "catalog/pg_constraint.h"
 #include "distributed/citus_nodefuncs.h"
-#include "distributed/citus_ruleutils.h"
 #include "distributed/deparse_shard_query.h"
 #include "distributed/insert_select_planner.h"
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
-#include "distributed/metadata_cache.h"
-#include "distributed/multi_physical_planner.h"
 #include "distributed/multi_router_planner.h"
 #include "distributed/shard_utils.h"
-#include "distributed/version_compat.h"
-#include "lib/stringinfo.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
-#include "nodes/nodes.h"
-#include "nodes/parsenodes.h"
-#include "nodes/pg_list.h"
-#include "parser/parsetree.h"
-#include "storage/lock.h"
 #include "utils/lsyscache.h"
-#include "utils/rel.h"
 #include "utils/syscache.h"
 
 static void UpdateTaskQueryString(Query *query, Oid distributedTableId,

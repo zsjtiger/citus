@@ -9,7 +9,6 @@
 
 #include "postgres.h"
 
-#include "fmgr.h"
 
 #include "distributed/query_stats.h"
 #include "utils/builtins.h"

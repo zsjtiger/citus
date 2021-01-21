@@ -10,7 +10,6 @@
  */
 #include "distributed/placement_access.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_cache.h"
 
 static List * BuildPlacementSelectList(int32 groupId, List *relationShardList);
 static List * BuildPlacementDDLList(int32 groupId, List *relationShardList);

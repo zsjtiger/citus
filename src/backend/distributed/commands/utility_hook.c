@@ -25,47 +25,26 @@
  *-------------------------------------------------------------------------
  */
 
-#include "distributed/pg_version_constants.h"
 
 #include "postgres.h"
 #include "miscadmin.h"
 
-#include "access/attnum.h"
-#include "access/heapam.h"
-#include "access/htup_details.h"
 #include "access/xact.h"
-#include "catalog/catalog.h"
-#include "catalog/dependency.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/tablecmds.h"
 #include "distributed/adaptive_executor.h"
-#include "distributed/colocation_utils.h"
 #include "distributed/commands.h"
 #include "distributed/commands/multi_copy.h"
 #include "distributed/commands/utility_hook.h" /* IWYU pragma: keep */
-#include "distributed/deparser.h"
 #include "distributed/deparse_shard_query.h"
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
 #include "distributed/maintenanced.h"
-#include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
-#include "distributed/multi_executor.h"
-#include "distributed/multi_explain.h"
-#include "distributed/multi_physical_planner.h"
 #include "distributed/resource_lock.h"
 #include "distributed/transmit.h"
-#include "distributed/version_compat.h"
-#include "distributed/worker_transaction.h"
-#include "lib/stringinfo.h"
-#include "nodes/parsenodes.h"
-#include "nodes/pg_list.h"
-#include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
-#include "utils/syscache.h"
 
 bool EnableDDLPropagation = true; /* ddl propagation is enabled */
 PropSetCmdBehavior PropagateSetCommands = PROPSETCMD_NONE; /* SET prop off */

@@ -11,12 +11,10 @@
  */
 
 #include "postgres.h"
-#include "fmgr.h"
 #include "funcapi.h"
 
 #include "distributed/coordinator_protocol.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_cache.h"
 #include "utils/builtins.h"
 
 

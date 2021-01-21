@@ -11,46 +11,14 @@
  */
 
 #include "postgres.h"
-#include "c.h"
-#include "fmgr.h"
-#include "libpq-fe.h"
-#include "miscadmin.h"
-#include "port.h"
 
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 
-#include "catalog/namespace.h"
-#include "catalog/pg_class.h"
-#include "distributed/listutils.h"
-#include "distributed/metadata_utility.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
-#include "distributed/multi_join_order.h"
 #include "distributed/multi_executor.h"
-#include "distributed/multi_partitioning_utils.h"
-#include "distributed/pg_dist_partition.h"
-#include "distributed/pg_dist_shard.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/resource_lock.h"
-#include "distributed/shardinterval_utils.h"
-#include "distributed/transaction_management.h"
-#include "distributed/worker_manager.h"
-#include "lib/stringinfo.h"
-#include "nodes/pg_list.h"
-#include "nodes/primnodes.h"
-#include "postmaster/postmaster.h"
-#include "storage/fd.h"
-#include "storage/lmgr.h"
-#include "storage/lock.h"
 #include "utils/builtins.h"
-#include "utils/elog.h"
-#include "utils/errcodes.h"
 #include "utils/lsyscache.h"
-#include "utils/palloc.h"
 
 
 /* declarations for dynamic loading */

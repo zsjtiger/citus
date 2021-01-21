@@ -13,8 +13,6 @@
 #include "postgres.h"
 
 #include "catalog/namespace.h"
-#include "lib/stringinfo.h"
-#include "nodes/value.h"
 #include "utils/builtins.h"
 
 #include "distributed/deparser.h"

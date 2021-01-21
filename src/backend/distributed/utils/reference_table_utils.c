@@ -10,34 +10,17 @@
  */
 
 #include "postgres.h"
-#include "miscadmin.h"
 
-#include "access/heapam.h"
-#include "access/htup_details.h"
-#include "access/genam.h"
 #include "distributed/colocation_utils.h"
-#include "distributed/commands.h"
-#include "distributed/listutils.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_utility.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
-#include "distributed/multi_executor.h"
-#include "distributed/multi_logical_planner.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/relation_access_tracking.h"
 #include "distributed/remote_commands.h"
 #include "distributed/resource_lock.h"
-#include "distributed/shardinterval_utils.h"
-#include "distributed/transaction_management.h"
-#include "distributed/worker_manager.h"
-#include "distributed/worker_transaction.h"
 #include "postmaster/postmaster.h"
-#include "storage/lmgr.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
-#include "utils/rel.h"
 
 /* local function forward declarations */
 static List * WorkersWithoutReferenceTablePlacement(uint64 shardId, LOCKMODE lockMode);

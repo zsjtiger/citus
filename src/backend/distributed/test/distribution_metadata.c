@@ -11,34 +11,15 @@
  */
 
 #include "postgres.h"
-#include "c.h"
-#include "fmgr.h"
 
-#include <stddef.h>
-#include <stdint.h>
 
-#include "access/heapam.h"
-#include "catalog/pg_type.h"
-#include "distributed/distribution_column.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_utility.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
-#include "distributed/multi_join_order.h"
 #include "distributed/multi_physical_planner.h"
 #include "distributed/pg_dist_shard.h"
 #include "distributed/query_utils.h"
 #include "distributed/resource_lock.h"
-#include "lib/stringinfo.h"
-#include "nodes/pg_list.h"
-#include "nodes/primnodes.h"
-#include "storage/lock.h"
-#include "tcop/tcopprot.h"
-#include "utils/array.h"
-#include "utils/elog.h"
-#include "utils/errcodes.h"
 #include "utils/builtins.h"
-#include "utils/palloc.h"
 
 
 /* declarations for dynamic loading */

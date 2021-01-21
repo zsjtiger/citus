@@ -18,23 +18,17 @@
  */
 
 
-#include <unistd.h>
 
 #include "postgres.h"
 
 
 #include "access/xact.h"
-#include "catalog/pg_type.h"
 #include "executor/spi.h"
-#include "miscadmin.h"
 #include "pgstat.h"
-#include "portability/instr_time.h"
 #include "storage/ipc.h"
-#include "storage/latch.h"
 #include "utils/snapmgr.h"
 
 #include "distributed/citus_acquire_lock.h"
-#include "distributed/citus_safe_lib.h"
 #include "distributed/connection_management.h"
 #include "distributed/version_compat.h"
 

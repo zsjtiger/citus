@@ -16,7 +16,6 @@
 
 #include "postgres.h"
 
-#include "access/htup_details.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -28,9 +27,7 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/typcache.h"
-#include "fmgr.h"
 #include "miscadmin.h"
-#include "pg_config_manual.h"
 
 PG_FUNCTION_INFO_V1(worker_partial_agg_sfunc);
 PG_FUNCTION_INFO_V1(worker_partial_agg_ffunc);

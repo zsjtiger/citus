@@ -12,7 +12,6 @@
 
 #include "postgres.h"
 
-#include "catalog/pg_class.h"
 #include "distributed/query_utils.h"
 #include "distributed/version_compat.h"
 #include "nodes/nodeFuncs.h"

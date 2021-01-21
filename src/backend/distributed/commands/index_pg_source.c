@@ -19,7 +19,6 @@
 
 #include "commands/defrem.h"
 #include "distributed/commands.h"
-#include "distributed/listutils.h"
 #include "mb/pg_wchar.h"
 
 

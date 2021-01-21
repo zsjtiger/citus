@@ -21,20 +21,11 @@
 
 #include "postgres.h"
 #include "commands/copy.h"
-#include "catalog/namespace.h"
-#include "parser/parse_relation.h"
-#include "utils/lsyscache.h"
-#include "nodes/makefuncs.h"
-#include "safe_lib.h"
-#include <netinet/in.h> /* for htons */
 
-#include "distributed/transmit.h"
 #include "distributed/commands/multi_copy.h"
-#include "distributed/multi_partitioning_utils.h"
 #include "distributed/local_executor.h"
 #include "distributed/local_multi_copy.h"
 #include "distributed/shard_utils.h"
-#include "distributed/version_compat.h"
 
 static int ReadFromLocalBufferCallback(void *outBuf, int minRead, int maxRead);
 static void AddSlotToBuffer(TupleTableSlot *slot, CitusCopyDestReceiver *copyDest,

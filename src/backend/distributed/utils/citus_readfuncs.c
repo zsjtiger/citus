@@ -9,7 +9,6 @@
  *
  *-------------------------------------------------------------------------
  */
-#include "postgres.h"
 
 #include "distributed/citus_nodefuncs.h"
 

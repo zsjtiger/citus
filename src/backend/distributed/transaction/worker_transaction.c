@@ -12,25 +12,12 @@
  */
 
 #include "postgres.h"
-#include "miscadmin.h"
-#include "libpq-fe.h"
 
-#include <sys/stat.h>
-#include <unistd.h>
 
-#include "access/xact.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_cache.h"
-#include "distributed/resource_lock.h"
 #include "distributed/metadata_sync.h"
 #include "distributed/remote_commands.h"
-#include "distributed/pg_dist_node.h"
-#include "distributed/pg_dist_transaction.h"
-#include "distributed/transaction_recovery.h"
-#include "distributed/worker_manager.h"
 #include "distributed/worker_transaction.h"
-#include "utils/memutils.h"
 
 
 static void SendCommandToMetadataWorkersParams(const char *command,

@@ -12,11 +12,8 @@
 
 #include "postgres.h"
 #include "miscadmin.h"
-#include "fmgr.h"
 
 #include "distributed/shared_connection_stats.h"
-#include "distributed/listutils.h"
-#include "nodes/parsenodes.h"
 #include "utils/guc.h"
 
 /* exports for SQL callable functions */

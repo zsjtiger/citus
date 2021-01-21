@@ -17,14 +17,10 @@
 #include "postgres.h"
 
 #include "catalog/namespace.h"
-#include "lib/stringinfo.h"
-#include "nodes/makefuncs.h"
-#include "nodes/parsenodes.h"
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
 
 #include "distributed/citus_ruleutils.h"
-#include "distributed/commands.h"
 #include "distributed/deparser.h"
 
 #define AlterEnumIsRename(stmt) (stmt->oldVal != NULL)

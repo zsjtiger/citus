@@ -10,7 +10,6 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 #include "distributed/relation_utils.h"
 

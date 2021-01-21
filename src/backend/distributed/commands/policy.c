@@ -14,7 +14,6 @@
 #include "commands/policy.h"
 #include "distributed/commands.h"
 #include "distributed/metadata_cache.h"
-#include "utils/builtins.h"
 
 
 /* placeholder for CreatePolicyCommands */

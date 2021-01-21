@@ -7,31 +7,18 @@
  *
  *-------------------------------------------------------------------------
  */
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include "postgres.h"
-#include "funcapi.h"
-#include "libpq-fe.h"
-#include "miscadmin.h"
-#include "port.h"
 
 #include "access/nbtree.h"
-#include "catalog/pg_am.h"
-#include "catalog/pg_type.h"
 #include "distributed/intermediate_results.h"
-#include "distributed/metadata_utility.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/multi_executor.h"
 #include "distributed/pg_dist_shard.h"
 #include "distributed/remote_commands.h"
 #include "distributed/tuplestore.h"
-#include "distributed/version_compat.h"
 #include "distributed/worker_protocol.h"
 #include "nodes/makefuncs.h"
-#include "nodes/primnodes.h"
 #include "tcop/pquery.h"
-#include "tcop/tcopprot.h"
 #include "utils/typcache.h"
 
 

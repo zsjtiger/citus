@@ -8,14 +8,11 @@
  */
 
 #include "postgres.h"
-#include "miscadmin.h"
 #include "pgstat.h"
 
 #include "distributed/function_utils.h"
 #include "distributed/listutils.h"
 #include "distributed/multi_progress.h"
-#include "distributed/version_compat.h"
-#include "storage/dsm.h"
 #include "utils/builtins.h"
 
 

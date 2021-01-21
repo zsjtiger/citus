@@ -10,9 +10,6 @@
 #include "postgres.h"
 
 #include "catalog/index.h"
-#include "catalog/namespace.h"
-#include "catalog/pg_class.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/coordinator_protocol.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_shard_visibility.h"

@@ -10,8 +10,6 @@
  */
 
 #include "postgres.h"
-#include "c.h"
-#include "fmgr.h"
 
 #include "distributed/relation_access_tracking.h"
 

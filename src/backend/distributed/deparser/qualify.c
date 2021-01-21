@@ -19,7 +19,6 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 #include "distributed/commands.h"
 #include "distributed/deparser.h"

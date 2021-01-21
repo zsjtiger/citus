@@ -11,24 +11,13 @@
  */
 
 #include "postgres.h"
-#include "libpq-fe.h"
 
-#include "safe_lib.h"
 
-#include "catalog/pg_type.h"
-#include "distributed/citus_safe_lib.h"
-#include "distributed/citus_ruleutils.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
 #include "distributed/multi_physical_planner.h"
 #include "distributed/shard_rebalancer.h"
-#include "funcapi.h"
-#include "miscadmin.h"
 #include "utils/builtins.h"
-#include "utils/int8.h"
 #include "utils/json.h"
-#include "utils/lsyscache.h"
-#include "utils/memutils.h"
 
 /* static declarations for json conversion */
 static List * JsonArrayToShardPlacementTestInfoList(

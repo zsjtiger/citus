@@ -10,11 +10,9 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/shard_cleaner.h"
 #include "distributed/worker_transaction.h"
 

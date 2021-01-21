@@ -11,7 +11,6 @@
  */
 
 #include "postgres.h"
-#include "fmgr.h"
 
 #include "distributed/backend_data.h"
 

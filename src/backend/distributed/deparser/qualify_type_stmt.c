@@ -18,10 +18,7 @@
 
 #include "postgres.h"
 
-#include "access/heapam.h"
-#include "access/htup_details.h"
 #include "catalog/namespace.h"
-#include "catalog/objectaddress.h"
 #include "catalog/pg_type.h"
 #include "distributed/commands.h"
 #include "distributed/deparser.h"

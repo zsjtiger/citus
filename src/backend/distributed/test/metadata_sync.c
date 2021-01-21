@@ -10,19 +10,12 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
-#include "c.h"
-#include "fmgr.h"
 
-#include "catalog/pg_type.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
-#include "distributed/maintenanced.h"
 #include "distributed/metadata_sync.h"
 #include "distributed/remote_commands.h"
 #include "postmaster/postmaster.h"
 #include "miscadmin.h"
-#include "storage/latch.h"
-#include "utils/array.h"
 #include "utils/builtins.h"
 
 

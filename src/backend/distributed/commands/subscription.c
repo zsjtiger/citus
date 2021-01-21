@@ -8,10 +8,8 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 #include "distributed/commands.h"
-#include "nodes/parsenodes.h"
 
 
 /* placeholder for ProcessCreateSubscriptionStmt */

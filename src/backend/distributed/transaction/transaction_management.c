@@ -13,17 +13,10 @@
 
 #include "postgres.h"
 
-#include "libpq-fe.h"
 
 #include "miscadmin.h"
 
-#include "access/twophase.h"
-#include "access/xact.h"
 #include "distributed/backend_data.h"
-#include "distributed/citus_safe_lib.h"
-#include "distributed/connection_management.h"
-#include "distributed/distributed_planner.h"
-#include "distributed/hash_helpers.h"
 #include "distributed/intermediate_results.h"
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
@@ -31,17 +24,9 @@
 #include "distributed/maintenanced.h"
 #include "distributed/multi_executor.h"
 #include "distributed/multi_explain.h"
-#include "distributed/repartition_join_execution.h"
-#include "distributed/transaction_management.h"
 #include "distributed/placement_connection.h"
-#include "distributed/shared_connection_stats.h"
 #include "distributed/subplan_execution.h"
-#include "distributed/version_compat.h"
 #include "distributed/worker_log_messages.h"
-#include "utils/hsearch.h"
-#include "utils/guc.h"
-#include "utils/memutils.h"
-#include "storage/fd.h"
 
 
 CoordinatedTransactionState CurrentCoordinatedTransactionState = COORD_TRANS_NONE;

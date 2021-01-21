@@ -12,13 +12,10 @@
 #include "postgres.h"
 
 #include "catalog/dependency.h"
-#include "catalog/namespace.h"
 #include "commands/defrem.h"
 #include "distributed/commands.h"
-#include "distributed/commands/sequence.h"
 #include "distributed/listutils.h"
 #include "distributed/metadata_cache.h"
-#include "nodes/parsenodes.h"
 
 /* Local functions forward declarations for helper functions */
 static bool OptionsSpecifyOwnedBy(List *optionList, Oid *ownedByTableId);

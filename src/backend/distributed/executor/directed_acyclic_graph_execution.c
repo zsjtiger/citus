@@ -9,18 +9,10 @@
 
 #include "postgres.h"
 #include "access/hash.h"
-#include "distributed/hash_helpers.h"
 
 #include "distributed/adaptive_executor.h"
 #include "distributed/directed_acyclic_graph_execution.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_cache.h"
-#include "distributed/multi_physical_planner.h"
-#include "distributed/multi_server_executor.h"
-#include "distributed/transaction_management.h"
-#include "distributed/transmit.h"
-#include "distributed/worker_manager.h"
-#include "distributed/worker_transaction.h"
 
 typedef struct TaskHashKey
 {

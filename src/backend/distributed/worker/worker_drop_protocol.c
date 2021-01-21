@@ -13,21 +13,13 @@
 
 #include "postgres.h"
 
-#include "access/genam.h"
-#include "access/heapam.h"
-#include "access/xact.h"
 #include "catalog/dependency.h"
 #include "catalog/pg_foreign_server.h"
-#include "distributed/citus_ruleutils.h"
-#include "distributed/distribution_column.h"
 #include "distributed/listutils.h"
-#include "distributed/metadata_utility.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/metadata/distobject.h"
 #include "foreign/foreign.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
 
 
 PG_FUNCTION_INFO_V1(worker_drop_distributed_table);

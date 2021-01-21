@@ -11,18 +11,13 @@
 #include "postgres.h"
 
 #include "catalog/dependency.h"
-#include "catalog/objectaddress.h"
 #include "commands/extension.h"
 #include "distributed/commands.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
 #include "distributed/metadata/dependency.h"
 #include "distributed/metadata/distobject.h"
 #include "distributed/metadata_sync.h"
-#include "distributed/remote_commands.h"
-#include "distributed/worker_manager.h"
 #include "distributed/worker_transaction.h"
-#include "storage/lmgr.h"
 #include "utils/lsyscache.h"
 
 typedef bool (*AddressPredicate)(const ObjectAddress *);

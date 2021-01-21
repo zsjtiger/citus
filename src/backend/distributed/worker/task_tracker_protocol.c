@@ -13,7 +13,6 @@
 
 #include "postgres.h"
 #include "funcapi.h"
-#include "miscadmin.h"
 
 
 /* exports for SQL callable functions */

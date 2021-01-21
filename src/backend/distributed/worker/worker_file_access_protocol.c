@@ -12,7 +12,6 @@
  */
 
 #include "postgres.h"
-#include "funcapi.h"
 
 #include "commands/defrem.h"
 #include "distributed/listutils.h"

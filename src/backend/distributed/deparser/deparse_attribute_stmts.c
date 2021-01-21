@@ -7,7 +7,6 @@
  *-------------------------------------------------------------------------
  */
 
-#include "postgres.h"
 
 #include "distributed/deparser.h"
 

@@ -9,14 +9,9 @@
  *
  *-------------------------------------------------------------------------
  */
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include "postgres.h"
 #include "funcapi.h"
-#include "libpq-fe.h"
-#include "miscadmin.h"
-#include "pgstat.h"
 
 static Size MemoryContextTotalSpace(MemoryContext context);
 

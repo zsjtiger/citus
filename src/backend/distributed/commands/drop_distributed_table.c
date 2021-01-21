@@ -9,15 +9,10 @@
  */
 
 #include "postgres.h"
-#include "miscadmin.h"
 
 #include "distributed/commands/utility_hook.h"
-#include "distributed/metadata_utility.h"
-#include "distributed/coordinator_protocol.h"
 #include "distributed/metadata_sync.h"
-#include "distributed/worker_transaction.h"
 #include "utils/builtins.h"
-#include "utils/lsyscache.h"
 
 
 /* local function forward declarations */

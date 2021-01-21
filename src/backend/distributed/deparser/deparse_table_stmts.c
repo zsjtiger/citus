@@ -9,11 +9,8 @@
  *
  *-------------------------------------------------------------------------
  */
-#include "postgres.h"
 
 #include "distributed/deparser.h"
-#include "nodes/nodes.h"
-#include "nodes/parsenodes.h"
 #include "utils/builtins.h"
 
 static void AppendAlterTableSchemaStmt(StringInfo buf, AlterObjectSchemaStmt *stmt);

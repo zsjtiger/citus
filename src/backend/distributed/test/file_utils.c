@@ -1,10 +1,6 @@
-#include "postgres.h"
 
 #include "distributed/worker_protocol.h"
 #include "distributed/transmit.h"
-#include "distributed/metadata_utility.h"
-#include "fmgr.h"
-#include "lib/stringinfo.h"
 
 PG_FUNCTION_INFO_V1(citus_rm_job_directory);
 

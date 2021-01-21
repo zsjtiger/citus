@@ -17,28 +17,11 @@
 
 #include "postgres.h"
 
-#include "access/htup_details.h"
-#include "catalog/namespace.h"
-#include "catalog/pg_proc.h"
-#include "catalog/pg_type.h"
 #include "commands/defrem.h"
-#include "distributed/citus_ruleutils.h"
-#include "distributed/commands.h"
 #include "distributed/deparser.h"
 #include "distributed/version_compat.h"
-#include "lib/stringinfo.h"
-#include "nodes/makefuncs.h"
-#include "nodes/nodes.h"
-#include "nodes/value.h"
-#include "parser/parse_func.h"
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
-#include "utils/fmgrprotos.h"
-#include "utils/guc.h"
-#include "utils/lsyscache.h"
-#include "utils/memutils.h"
-#include "utils/syscache.h"
 #include "utils/regproc.h"
 
 

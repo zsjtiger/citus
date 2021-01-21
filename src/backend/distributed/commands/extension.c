@@ -14,21 +14,17 @@
 #include "catalog/pg_extension_d.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
-#include "distributed/citus_ruleutils.h"
 #include "distributed/commands.h"
 #include "distributed/commands/utility_hook.h"
 #include "distributed/deparser.h"
 #include "distributed/listutils.h"
-#include "distributed/coordinator_protocol.h"
 #include "distributed/metadata_sync.h"
 #include "distributed/metadata/dependency.h"
 #include "distributed/metadata/distobject.h"
 #include "distributed/multi_executor.h"
 #include "distributed/relation_access_tracking.h"
-#include "distributed/transaction_management.h"
 #include "nodes/makefuncs.h"
 #include "utils/lsyscache.h"
-#include "utils/builtins.h"
 
 
 /* Local functions forward declarations for helper functions */

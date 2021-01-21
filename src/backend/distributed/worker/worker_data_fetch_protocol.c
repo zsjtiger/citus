@@ -13,44 +13,22 @@
  */
 
 #include "postgres.h"
-#include "funcapi.h"
-#include "libpq-fe.h"
 #include "miscadmin.h"
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "access/xact.h"
-#include "catalog/dependency.h"
-#include "catalog/namespace.h"
-#include "catalog/pg_type.h"
-#include "commands/copy.h"
-#include "commands/dbcommands.h"
-#include "commands/extension.h"
-#include "commands/sequence.h"
-#include "distributed/citus_ruleutils.h"
 #include "distributed/commands/utility_hook.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
-#include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/multi_client_executor.h"
 #include "distributed/commands/multi_copy.h"
-#include "distributed/multi_logical_optimizer.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/multi_server_executor.h"
-#include "distributed/relay_utility.h"
-#include "distributed/remote_commands.h"
 #include "distributed/resource_lock.h"
 
 #include "distributed/worker_protocol.h"
-#include "distributed/version_compat.h"
 #include "nodes/makefuncs.h"
-#include "storage/lmgr.h"
-#include "tcop/tcopprot.h"
-#include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
-#include "utils/regproc.h"
 #include "utils/varlena.h"
 
 

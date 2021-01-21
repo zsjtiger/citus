@@ -11,35 +11,16 @@
  */
 
 #include "postgres.h"
-#include "libpq-fe.h"
-#include "miscadmin.h"
-#include "fmgr.h"
 #include "postmaster/postmaster.h"
 
-#include "funcapi.h"
-#include "access/htup_details.h"
-#include "catalog/pg_type.h"
-#include "datatype/timestamp.h"
-#include "distributed/backend_data.h"
-#include "distributed/connection_management.h"
 #include "distributed/listutils.h"
 #include "distributed/lock_graph.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/remote_commands.h"
-#include "distributed/transaction_identifier.h"
 #include "distributed/tuplestore.h"
 #include "executor/spi.h"
-#include "nodes/execnodes.h"
-#include "storage/ipc.h"
-#include "storage/lwlock.h"
-#include "storage/proc.h"
-#include "storage/spin.h"
-#include "storage/s_lock.h"
 #include "utils/builtins.h"
-#include "utils/fmgrprotos.h"
 #include "utils/inet.h"
-#include "utils/timestamp.h"
 
 
 /*

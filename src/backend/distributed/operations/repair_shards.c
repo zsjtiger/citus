@@ -11,43 +11,18 @@
  */
 
 #include "postgres.h"
-#include "fmgr.h"
-#include "miscadmin.h"
 
-#include <string.h>
 
-#include "access/htup_details.h"
-#include "catalog/pg_class.h"
-#include "catalog/pg_enum.h"
-#include "distributed/citus_ruleutils.h"
 #include "distributed/colocation_utils.h"
 #include "distributed/commands.h"
-#include "distributed/connection_management.h"
 #include "distributed/distributed_planner.h"
-#include "distributed/listutils.h"
-#include "distributed/shard_cleaner.h"
 #include "distributed/coordinator_protocol.h"
-#include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
-#include "distributed/multi_join_order.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/resource_lock.h"
-#include "distributed/worker_manager.h"
-#include "distributed/worker_protocol.h"
-#include "distributed/worker_transaction.h"
-#include "lib/stringinfo.h"
-#include "nodes/pg_list.h"
-#include "storage/lmgr.h"
-#include "storage/lock.h"
-#include "storage/lmgr.h"
 #include "utils/builtins.h"
-#include "utils/elog.h"
-#include "utils/errcodes.h"
 #include "utils/lsyscache.h"
-#include "utils/palloc.h"
-#include "utils/rel.h"
-#include "utils/syscache.h"
 
 /* local function forward declarations */
 static void ErrorIfTableCannotBeReplicated(Oid relationId);

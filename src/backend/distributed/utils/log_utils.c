@@ -9,7 +9,6 @@
 
 #include "postgres.h"
 
-#include "utils/guc.h"
 #include "distributed/log_utils.h"
 
 
