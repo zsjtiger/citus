@@ -165,7 +165,6 @@ static DeferredErrorMessage * DeferErrorIfUnsupportedRouterPlannableSelectQuery(
 static DeferredErrorMessage * ErrorIfQueryHasUnroutableModifyingCTE(Query *queryTree);
 static bool SelectsFromDistributedTable(List *rangeTableList, Query *query);
 static ShardPlacement * CreateDummyPlacement(bool hasLocalRelation);
-static ShardPlacement * CreateLocalDummyPlacement();
 static int CompareInsertValuesByShardId(const void *leftElement,
 										const void *rightElement);
 static List * SingleShardTaskList(Query *query, uint64 jobId,
@@ -2428,8 +2427,8 @@ CreateTaskPlacementListForShardIntervals(List *shardIntervalListList, bool shard
  *       (a) queries that consist of only intermediate results
  *       (b) queries that hit zero shards (... WHERE false;)
  */
-static ShardPlacement *
-CreateLocalDummyPlacement()
+ShardPlacement *
+CreateLocalDummyPlacement(void)
 {
 	ShardPlacement *dummyPlacement = CitusMakeNode(ShardPlacement);
 	dummyPlacement->nodeId = LOCAL_NODE_ID;

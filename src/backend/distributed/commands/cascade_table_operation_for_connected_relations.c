@@ -21,10 +21,12 @@
 #include "catalog/pg_constraint.h"
 #include "distributed/commands/utility_hook.h"
 #include "distributed/commands.h"
+#include "distributed/deparse_shard_query.h"
 #include "distributed/foreign_key_relationship.h"
 #include "distributed/listutils.h"
 #include "distributed/multi_executor.h"
 #include "distributed/multi_partitioning_utils.h"
+#include "distributed/multi_router_planner.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/relation_access_tracking.h"
 #include "distributed/worker_protocol.h"
@@ -423,11 +425,16 @@ ExecuteAndLogDDLCommandList(List *ddlCommandList)
 void
 ExecuteAndLogDDLCommand(const char *commandString)
 {
-	ereport(DEBUG4, (errmsg("executing \"%s\"", commandString)));
+	DDLJob *ddlJob = palloc0(sizeof(DDLJob));
 
-	Node *parseTree = ParseTreeNode(commandString);
-	ProcessUtilityParseTree(parseTree, commandString, PROCESS_UTILITY_TOPLEVEL,
-							NULL, None_Receiver, NULL);
+	Task *task = CitusMakeNode(Task);
+	task->taskType = DDL_TASK;
+	SetTaskQueryString(task, pstrdup(commandString));
+	task->replicationModel = REPLICATION_MODEL_INVALID;
+	task->taskPlacementList = list_make1(CreateLocalDummyPlacement());
+	ddlJob->taskList = list_make1(task);
+
+	ExecuteDistributedDDLJob(ddlJob);
 }
 
 
@@ -456,28 +463,6 @@ ExecuteForeignKeyCreateCommandList(List *ddlCommandList, bool skip_validation)
 static void
 ExecuteForeignKeyCreateCommand(const char *commandString, bool skip_validation)
 {
-	ereport(DEBUG4, (errmsg("executing foreign key create command \"%s\"",
-							commandString)));
-
-	Node *parseTree = ParseTreeNode(commandString);
-
-	/*
-	 * We might have thrown an error if IsA(parseTree, AlterTableStmt),
-	 * but that doesn't seem to provide any benefits, so assertion is
-	 * fine for this case.
-	 */
-	Assert(IsA(parseTree, AlterTableStmt));
-
-	if (skip_validation && IsA(parseTree, AlterTableStmt))
-	{
-		parseTree =
-			SkipForeignKeyValidationIfConstraintIsFkey((AlterTableStmt *) parseTree,
-													   true);
-
-		ereport(DEBUG4, (errmsg("skipping validation for foreign key create "
-								"command \"%s\"", commandString)));
-	}
-
-	ProcessUtilityParseTree(parseTree, commandString, PROCESS_UTILITY_TOPLEVEL,
-							NULL, None_Receiver, NULL);
+	/* TODO: find a way pass skip_validation to executor */
+	ExecuteAndLogDDLCommand(commandString);
 }

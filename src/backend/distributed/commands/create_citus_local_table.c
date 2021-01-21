@@ -115,14 +115,6 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 	InsertCoordinatorIfClusterEmpty();
 
 	/*
-	 * Creating Citus local tables relies on functions that accesses
-	 * shards locally (e.g., ExecuteAndLogDDLCommand()). As long as
-	 * we don't teach those functions to access shards remotely, we
-	 * cannot relax this check.
-	 */
-	SetLocalExecutionStatus(LOCAL_EXECUTION_REQUIRED);
-
-	/*
 	 * Lock target relation with an AccessExclusiveLock as we don't want
 	 * multiple backends manipulating this relation. We could actually simply
 	 * lock the relation without opening it. However, we also want to check

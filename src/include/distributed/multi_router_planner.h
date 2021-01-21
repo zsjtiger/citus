@@ -50,6 +50,7 @@ extern List * CreateTaskPlacementListForShardIntervals(List *shardIntervalList,
 													   bool shardsPresent,
 													   bool generateDummyPlacement,
 													   bool hasLocalRelation);
+extern ShardPlacement * CreateLocalDummyPlacement(void);
 extern List * RouterInsertTaskList(Query *query, bool parametersInQueryResolved,
 								   DeferredErrorMessage **planningError);
 extern Const * ExtractInsertPartitionKeyValue(Query *query);
