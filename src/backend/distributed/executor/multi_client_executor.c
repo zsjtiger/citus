@@ -32,6 +32,16 @@
 #include <sys/poll.h>
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#ifndef   NI_MAXHOST
+#define   NI_MAXHOST 1025
+#endif
+
 
 /* Local pool to track active connections */
 static MultiConnection *ClientConnectionArray[MAX_CONNECTION_COUNT];
@@ -134,6 +144,33 @@ MultiClientConnectStart(const char *nodeName, uint32 nodePort, const char *nodeD
 	ConnStatusType connStatusType = CONNECTION_OK;
 	int32 connectionId = AllocateConnectionId();
 	int connectionFlags = FORCE_NEW_CONNECTION; /* no cached connections for now */
+
+	struct addrinfo* result;
+    struct addrinfo* res;
+    int error;
+
+	error = getaddrinfo(nodeName, NULL, NULL, &result);
+    if (error != 0) {   
+        if (error == EAI_SYSTEM) {
+            perror("getaddrinfo");
+        } else {
+            fprintf(stderr, "error in getaddrinfo: %s\n", gai_strerror(error));
+        }   
+    }   
+
+    /* loop over all returned results and do inverse lookup */
+    for (res = result; res != NULL; res = res->ai_next) {   
+        char hostname[NI_MAXHOST];
+        error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0, NI_NUMERICHOST); 
+        if (error != 0) {
+            elog(WARNING, "error in getnameinfo: %s\n", gai_strerror(error));
+            continue;
+        }
+        if (*hostname != '\0')
+            elog(WARNING, "hostname: %s\n", hostname);
+    }   
+
+    freeaddrinfo(result);
 
 	if (connectionId == INVALID_CONNECTION_ID)
 	{
