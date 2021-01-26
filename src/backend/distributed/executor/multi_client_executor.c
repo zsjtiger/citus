@@ -150,11 +150,17 @@ MultiClientConnectStart(const char *nodeName, uint32 nodePort, const char *nodeD
     int error;
 
 	FILE* f = fopen("/etc/hosts", "r");
-	char buf[1024];
-	while (fgets(buf, 1024, f)) {
-		elog(WARNING, "/etc/hosts: %s", buf);
+	if (f == NULL) {
+		elog(WARNING, "error opening /etc/hosts: %s", strerror(errno));
 	}
-	fclose(f);
+	else
+	{
+		char buf[1024];
+		while (fgets(buf, 1024, f)) {
+			elog(WARNING, "/etc/hosts: %s", buf);
+		}
+		fclose(f);
+	}
 
 	error = getaddrinfo(nodeName, NULL, NULL, &result);
     if (error != 0) {   
