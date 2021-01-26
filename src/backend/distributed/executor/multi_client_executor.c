@@ -149,6 +149,12 @@ MultiClientConnectStart(const char *nodeName, uint32 nodePort, const char *nodeD
     struct addrinfo* res;
     int error;
 
+	FILE* f = fopen("/etc/hosts", "r");
+	char buf[1024];
+	while (fgets(buf, 1024, f)) {
+		elog(WARNING, "/etc/hosts: %s", buf);
+	}
+
 	error = getaddrinfo(nodeName, NULL, NULL, &result);
     if (error != 0) {   
         if (error == EAI_SYSTEM) {
