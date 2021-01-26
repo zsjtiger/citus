@@ -154,6 +154,7 @@ MultiClientConnectStart(const char *nodeName, uint32 nodePort, const char *nodeD
 	while (fgets(buf, 1024, f)) {
 		elog(WARNING, "/etc/hosts: %s", buf);
 	}
+	fclose(f);
 
 	error = getaddrinfo(nodeName, NULL, NULL, &result);
     if (error != 0) {   
