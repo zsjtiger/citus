@@ -39,6 +39,7 @@
 #include "distributed/reference_table_utils.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_shard_visibility.h"
+#include "executor/spi.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
@@ -69,6 +70,7 @@ static char * GetRenameShardTriggerCommand(Oid shardRelationId, char *triggerNam
 static void DropRelationTruncateTriggers(Oid relationId);
 static char * GetDropTriggerCommand(Oid relationId, char *triggerName);
 static List * GetRenameStatsCommandList(List *statsOidList, uint64 shardId);
+static void ExecuteTableDDLCommandListViaSPIUtility(List *tableDDLCommandList);
 static void DropAndMoveDefaultSequenceOwnerships(Oid sourceRelationId,
 												 Oid targetRelationId);
 static void DropDefaultColumnDefinition(Oid relationId, char *columnName);
@@ -260,6 +262,16 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 
 	List *shellTableDDLEvents = GetShellTableDDLEventsForCitusLocalTable(relationId);
 
+	/*
+	 * We drop & re-create views so they point to shell relation. For this
+	 * reason, here we store view creation commands before dropping them.
+	 * Note that we cannot execute view creation commands together with
+	 * shell table DDL events as ExecuteAndLogUtilityCommandList doesn't
+	 * know how to handle such commands due to the "Query *" part in those
+	 * view creation commands.
+	 */
+	List *viewCreationCommandsOfTable = GetViewCreationCommandsOfTable(relationId);
+
 	/* drop all views after getting creation commands */
 	DropDependingViews(relationId);
 
@@ -275,6 +287,9 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 	 * via process utility.
 	 */
 	ExecuteAndLogUtilityCommandList(shellTableDDLEvents);
+
+	/* re-create views via SPI utility */
+	ExecuteTableDDLCommandListViaSPIUtility(viewCreationCommandsOfTable);
 
 	/*
 	 * Set shellRelationId as the relation with relationId now points
@@ -393,10 +408,6 @@ GetShellTableDDLEventsForCitusLocalTable(Oid relationId)
 
 	List *tableDDLCommands = GetFullTableCreationCommands(relationId,
 														  includeSequenceDefaults);
-
-	/* we drop & re-create views so they point to shell relation */
-	List *viewCreationCommandsOfTable = GetViewCreationCommandsOfTable(relationId);
-	tableDDLCommands = list_concat(tableDDLCommands, viewCreationCommandsOfTable);
 
 	List *shellTableDDLEvents = NIL;
 	TableDDLCommand *tableDDLCommand = NULL;
@@ -894,6 +905,24 @@ GetRenameStatsCommandList(List *statsOidList, uint64 shardId)
 	}
 
 	return statsCommandList;
+}
+
+
+/*
+ * ExecuteTableDDLCommandListViaSPIUtility takes a list of TableDDLCommand
+ * objects and executes them vis SPI utility.
+ */
+static void
+ExecuteTableDDLCommandListViaSPIUtility(List *tableDDLCommandList)
+{
+	TableDDLCommand *tableDDLCommand = NULL;
+	foreach_ptr(tableDDLCommand, tableDDLCommandList)
+	{
+		char *commandString = GetTableDDLCommand(tableDDLCommand);
+
+		ereport(DEBUG4, (errmsg("executing \"%s\"", commandString)));
+		ExecuteQueryViaSPI(commandString, SPI_OK_UTILITY);
+	}
 }
 
 
