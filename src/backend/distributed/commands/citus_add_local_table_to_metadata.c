@@ -33,6 +33,7 @@
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
 #include "distributed/metadata_sync.h"
+#include "distributed/metadata/dependency.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/namespace_utils.h"
 #include "distributed/reference_table_utils.h"
@@ -48,6 +49,8 @@
 static void ErrorIfUnsupportedCreateCitusLocalTable(Relation relation);
 static void ErrorIfUnsupportedCitusLocalTableKind(Oid relationId);
 static List * GetShellTableDDLEventsForCitusLocalTable(Oid relationId);
+static void DropDependingViews(Oid relationId);
+static char * GetDropViewCommand(Oid viewId);
 static uint64 ConvertLocalTableToShard(Oid relationId);
 static void RenameRelationToShardRelation(Oid shellRelationId, uint64 shardId);
 static void RenameShardRelationConstraints(Oid shardRelationId, uint64 shardId);
@@ -257,6 +260,9 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 
 	List *shellTableDDLEvents = GetShellTableDDLEventsForCitusLocalTable(relationId);
 
+	/* drop all views after getting creation commands */
+	DropDependingViews(relationId);
+
 	char *relationName = get_rel_name(relationId);
 	Oid relationSchemaId = get_rel_namespace(relationId);
 
@@ -388,6 +394,10 @@ GetShellTableDDLEventsForCitusLocalTable(Oid relationId)
 	List *tableDDLCommands = GetFullTableCreationCommands(relationId,
 														  includeSequenceDefaults);
 
+	/* we drop & re-create views so they point to shell relation */
+	List *viewCreationCommandsOfTable = GetViewCreationCommandsOfTable(relationId);
+	tableDDLCommands = list_concat(tableDDLCommands, viewCreationCommandsOfTable);
+
 	List *shellTableDDLEvents = NIL;
 	TableDDLCommand *tableDDLCommand = NULL;
 	foreach_ptr(tableDDLCommand, tableDDLCommands)
@@ -399,6 +409,50 @@ GetShellTableDDLEventsForCitusLocalTable(Oid relationId)
 	shellTableDDLEvents = list_concat(shellTableDDLEvents, foreignConstraintCommands);
 
 	return shellTableDDLEvents;
+}
+
+
+/*
+ * DropDependingViews drops views depending on view.
+ */
+static void
+DropDependingViews(Oid relationId)
+{
+	/*
+	 * GetDependingViews returns dependencies in topological order.
+	 * So we should start dropping views in the reverse order.
+	 */
+	List *dependingViews = GetDependingViews(relationId);
+	while (list_length(dependingViews) > 0)
+	{
+		Oid viewId = llast_oid(dependingViews);
+		char *dropViewCascadeCommand = GetDropViewCommand(viewId);
+		ExecuteAndLogUtilityCommand(dropViewCascadeCommand);
+
+		int listSize = list_length(dependingViews);
+		dependingViews = list_truncate(dependingViews, listSize - 1);
+	}
+}
+
+
+/*
+ * GetDropViewCommand returns DDL command to drop view with viewId.
+ */
+static char *
+GetDropViewCommand(Oid viewId)
+{
+	char *viewName = get_rel_name(viewId);
+	Oid viewSchemaId = get_rel_namespace(viewId);
+	char *viewSchemaName = get_namespace_name(viewSchemaId);
+	char *qualifiedViewName = quote_qualified_identifier(viewSchemaName, viewName);
+
+	bool isMatView = get_rel_relkind(viewId) == RELKIND_MATVIEW;
+	StringInfo dropViewCascadeCommand = makeStringInfo();
+	appendStringInfo(dropViewCascadeCommand, "DROP %s VIEW %s;",
+					 isMatView ? "MATERIALIZED" : "",
+					 qualifiedViewName);
+
+	return dropViewCascadeCommand->data;
 }
 
 

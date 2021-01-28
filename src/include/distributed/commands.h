@@ -502,4 +502,7 @@ extern void PostprocessVariableSetStmt(VariableSetStmt *setStmt, const char *set
 
 extern void CreateCitusLocalTable(Oid relationId, bool cascade);
 
+/* alter_table.c */
+extern List * GetViewCreationCommandsOfTable(Oid relationId);
+
 #endif /*CITUS_COMMANDS_H */
