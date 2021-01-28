@@ -849,31 +849,8 @@ ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement
 		 * Also, as CopyErrorData() requires (CurrentMemoryContext != ErrorContext),
 		 * so we store CurrentMemoryContext here.
 		 */
-		MemoryContext savedMemoryContext = CurrentMemoryContext;
-		PG_TRY();
-		{
-			bool cascade = true;
-			CreateCitusLocalTable(relationId, cascade);
-		}
-		PG_CATCH();
-		{
-			MemoryContextSwitchTo(savedMemoryContext);
-
-			ErrorData *errorData = CopyErrorData();
-			FlushErrorState();
-
-			if (errorData->elevel != ERROR)
-			{
-				PG_RE_THROW();
-			}
-
-			/* override error detail */
-			errorData->detail = "When adding a foreign key from a local table to "
-								"a reference table, Citus applies a conversion to "
-								"all the local tables in the foreign key graph";
-			ThrowErrorData(errorData);
-		}
-		PG_END_TRY();
+		bool cascade = true;
+		CreateCitusLocalTable(relationId, cascade);
 	}
 }
 
