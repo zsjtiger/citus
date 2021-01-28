@@ -1441,7 +1441,7 @@ WarningsForDroppingForeignKeysWithDistributedTables(Oid relationId)
  * returned the OK value and finishes the SPI connection
  */
 void
-ExecuteQueryViaSPI(const char *query, int SPIOK)
+ExecuteQueryViaSPI(char *query, int SPIOK)
 {
 	int spiResult = SPI_connect();
 	if (spiResult != SPI_OK_CONNECT)

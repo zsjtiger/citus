@@ -504,6 +504,5 @@ extern void CreateCitusLocalTable(Oid relationId, bool cascade);
 
 /* alter_table.c */
 extern List * GetViewCreationCommandsOfTable(Oid relationId);
-extern void ExecuteQueryViaSPI(const char *query, int SPIOK);
 
 #endif /*CITUS_COMMANDS_H */
