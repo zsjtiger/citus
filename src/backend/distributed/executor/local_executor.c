@@ -81,6 +81,7 @@
 #include "distributed/pg_version_constants.h"
 
 #include "distributed/adaptive_executor.h"
+#include "distributed/commands.h"
 #include "distributed/commands/utility_hook.h"
 #include "distributed/citus_custom_scan.h"
 #include "distributed/citus_ruleutils.h"
@@ -98,6 +99,7 @@
 #include "distributed/transaction_management.h"
 #include "distributed/version_compat.h"
 #include "distributed/worker_protocol.h"
+#include "executor/spi.h"
 #include "executor/tstoreReceiver.h"
 #include "executor/tuptable.h"
 #if PG_VERSION_NUM >= PG_VERSION_12
@@ -405,9 +407,7 @@ ExecuteUtilityCommand(const char *taskQueryCommand)
 			 * It is a regular utility command we should execute it via
 			 * process utility.
 			 */
-			ProcessUtilityParseTree(taskRawParseTree, taskQueryCommand,
-									PROCESS_UTILITY_TOPLEVEL, NULL, None_Receiver,
-									NULL);
+			ExecuteQueryViaSPI(taskQueryCommand, SPI_OK_UTILITY);
 		}
 	}
 }
