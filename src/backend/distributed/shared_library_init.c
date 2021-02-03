@@ -947,6 +947,18 @@ RegisterCitusConfigVariables(void)
 		GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
 
+
+	DefineCustomStringVariable(
+		"citus.grep_remote_commands",
+		gettext_noop("filters out the remote commands"),
+		NULL,
+		&GrepRemoteCommands,
+		"",
+		PGC_USERSET,
+		GUC_NO_SHOW_ALL,
+		NULL, NULL, NULL);
+
+
 	DefineCustomIntVariable(
 		"citus.executor_slow_start_interval",
 		gettext_noop("Time to wait between opening connections to the same worker node"),

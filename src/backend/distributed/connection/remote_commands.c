@@ -30,7 +30,7 @@
 
 /* GUC, determining whether statements sent to remote nodes are logged */
 bool LogRemoteCommands = false;
-
+char *GrepRemoteCommands = "";
 
 static bool ClearResultsInternal(MultiConnection *connection, bool raiseErrors,
 								 bool discardWarnings);
@@ -333,6 +333,12 @@ void
 LogRemoteCommand(MultiConnection *connection, const char *command)
 {
 	if (!LogRemoteCommands)
+	{
+		return;
+	}
+
+
+	if (strstr(command, GrepRemoteCommands) == NULL)
 	{
 		return;
 	}

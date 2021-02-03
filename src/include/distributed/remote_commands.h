@@ -20,6 +20,7 @@
 
 /* GUC, determining whether statements sent to remote nodes are logged */
 extern bool LogRemoteCommands;
+extern char *GrepRemoteCommands;
 
 
 /* simple helpers */
