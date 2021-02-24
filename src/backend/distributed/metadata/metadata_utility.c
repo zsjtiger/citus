@@ -543,29 +543,42 @@ GenerateSizeQueryOnMultiplePlacements(List *shardIntervalList, char *sizeQuery)
 {
 	StringInfo selectQuery = makeStringInfo();
 
-	appendStringInfo(selectQuery, "SELECT ");
-
-	ShardInterval *shardInterval = NULL;
-	foreach_ptr(shardInterval, shardIntervalList)
+	if (list_length(shardIntervalList) > 0)
 	{
-		uint64 shardId = shardInterval->shardId;
-		Oid schemaId = get_rel_namespace(shardInterval->relationId);
-		char *schemaName = get_namespace_name(schemaId);
-		char *shardName = get_rel_name(shardInterval->relationId);
-		AppendShardIdToName(&shardName, shardId);
+		appendStringInfoString(selectQuery, "SELECT ");
+		appendStringInfoString(selectQuery, "sum(");
+		appendStringInfo(selectQuery, sizeQuery, "a.name");
+		appendStringInfoString(selectQuery, ") FROM ");
 
-		char *shardQualifiedName = quote_qualified_identifier(schemaName, shardName);
-		char *quotedShardName = quote_literal_cstr(shardQualifiedName);
+		appendStringInfoString(selectQuery, " (VALUES ");
 
-		appendStringInfo(selectQuery, sizeQuery, quotedShardName);
-		appendStringInfo(selectQuery, " + ");
+		ShardInterval *shardInterval = NULL;
+		bool first = true;
+		foreach_ptr(shardInterval, shardIntervalList)
+		{
+			uint64 shardId = shardInterval->shardId;
+			Oid schemaId = get_rel_namespace(shardInterval->relationId);
+			char *schemaName = get_namespace_name(schemaId);
+			char *shardName = get_rel_name(shardInterval->relationId);
+			AppendShardIdToName(&shardName, shardId);
+
+			char *shardQualifiedName = quote_qualified_identifier(schemaName, shardName);
+			char *quotedShardName = quote_literal_cstr(shardQualifiedName);
+
+			if (!first)
+			{
+				appendStringInfoString(selectQuery, ",");
+			}
+			appendStringInfo(selectQuery, "(%s)", quotedShardName);
+			first = false;
+		}
+
+		appendStringInfoString(selectQuery, ") AS a(name);");
 	}
-
-	/*
-	 * Add 0 as a last size, it handles empty list case and makes size control checks
-	 * unnecessary which would have implemented without this line.
-	 */
-	appendStringInfo(selectQuery, "0;");
+	else
+	{
+		appendStringInfoString(selectQuery, "SELECT 0;");
+	}
 
 	return selectQuery;
 }
