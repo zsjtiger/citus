@@ -754,7 +754,8 @@ ColocationIdForNewTable(Oid relationId, Var *distributionColumn,
 		}
 		else if (IsColocateWithNone(colocateWithTableName))
 		{
-			colocationId = GetNextColocationId();
+			colocationId = CreateColocationGroup(shardCount, ShardReplicationFactor,
+												 distributionColumnType, distributionColumnCollation);
 
 			createdColocationGroup = true;
 		}
