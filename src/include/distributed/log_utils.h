@@ -16,11 +16,18 @@
 #define CITUS_LOG_LEVEL_OFF 0
 
 
-extern bool IsLoggableLevel(int logLevel);
 extern char * HashLogMessage(const char *text);
 
 #define ApplyLogRedaction(text) \
 	(log_min_messages <= ereport_loglevel ? HashLogMessage(text) : text)
+
+/*
+ * IsLoggableLevel evaluates to true if either of client or server log
+ * guc is configured to log the given log level.
+ * In postgres, log can be configured differently for clients and servers.
+ */
+#define IsLoggableLevel(logLevel) \
+	(log_min_messages <= logLevel || client_min_messages <= logLevel)
 
 #undef ereport
 #define ereport(elevel, rest) \

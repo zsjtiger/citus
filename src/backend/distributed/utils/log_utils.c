@@ -14,18 +14,6 @@
 
 
 /*
- * IsLoggableLevel returns true if either of client or server log guc is configured to
- * log the given log level.
- * In postgres, log can be configured differently for clients and servers.
- */
-bool
-IsLoggableLevel(int logLevel)
-{
-	return log_min_messages <= logLevel || client_min_messages <= logLevel;
-}
-
-
-/*
  * HashLogMessage is only supported in Citus Enterprise
  */
 char *
