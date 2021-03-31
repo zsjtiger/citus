@@ -45,7 +45,7 @@ struct ColumnarWriteState
 	ColumnarOptions options;
 	ChunkData *chunkData;
 
-	List *chunkGroupRowCounts;
+	uint32 chunkGroupRowCount;
 
 	/*
 	 * compressionBuffer buffer is used as temporary storage during
@@ -546,12 +546,12 @@ FlushStripe(ColumnarWriteState *writeState)
 
 	SaveChunkGroups(writeState->relfilenode,
 					stripeMetadata.id,
-					writeState->chunkGroupRowCounts);
+					stripeSkipList->chunkCount);
 	SaveStripeSkipList(writeState->relfilenode,
 					   stripeMetadata.id,
 					   stripeSkipList, tupleDescriptor);
 
-	writeState->chunkGroupRowCounts = NIL;
+	writeState->chunkGroupRowCount = 0;
 
 	relation_close(relation, NoLock);
 }
@@ -640,8 +640,7 @@ SerializeChunkData(ColumnarWriteState *writeState, uint32 chunkIndex, uint32 row
 	const uint32 columnCount = stripeBuffers->columnCount;
 	StringInfo compressionBuffer = writeState->compressionBuffer;
 
-	writeState->chunkGroupRowCounts =
-		lappend_int(writeState->chunkGroupRowCounts, rowCount);
+	writeState->chunkGroupRowCount = rowCount;
 
 	/* serialize exist values, data values are already serialized */
 	for (columnIndex = 0; columnIndex < columnCount; columnIndex++)

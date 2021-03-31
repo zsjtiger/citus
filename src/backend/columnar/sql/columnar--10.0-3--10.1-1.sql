@@ -16,3 +16,5 @@ ALTER TABLE columnar.chunk_group DROP CONSTRAINT chunk_group_storage_id_fkey;
   $$;
 END IF;
 END$proc$;
+
+ALTER TABLE columnar.chunk_group DROP COLUMN row_count;

@@ -352,8 +352,7 @@ static ChunkGroupReadState *
 BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupleDesc,
 					List *projectedColumnList, MemoryContext cxt)
 {
-	uint32 chunkGroupRowCount =
-		stripeBuffers->selectedChunkGroupRowCounts[chunkIndex];
+	uint32 chunkGroupRowCount = stripeBuffers->stripeChunkGroupRowCount;
 
 	MemoryContext oldContext = MemoryContextSwitchTo(cxt);
 
@@ -577,8 +576,8 @@ LoadFilteredStripeBuffers(Relation relation, StripeMetadata *stripeMetadata,
 	stripeBuffers->columnCount = columnCount;
 	stripeBuffers->rowCount = StripeSkipListRowCount(selectedChunkSkipList);
 	stripeBuffers->columnBuffersArray = columnBuffersArray;
-	stripeBuffers->selectedChunkGroupRowCounts =
-		selectedChunkSkipList->chunkGroupRowCounts;
+	stripeBuffers->stripeChunkGroupRowCount =
+		selectedChunkSkipList->chunkGroupRowCount;
 
 	return stripeBuffers;
 }
@@ -899,22 +898,11 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 		}
 	}
 
-	selectedChunkIndex = 0;
-	uint32 *chunkGroupRowCounts = palloc0(selectedChunkCount * sizeof(uint32));
-	for (chunkIndex = 0; chunkIndex < stripeSkipList->chunkCount; chunkIndex++)
-	{
-		if (selectedChunkMask[chunkIndex])
-		{
-			chunkGroupRowCounts[selectedChunkIndex++] =
-				stripeSkipList->chunkGroupRowCounts[chunkIndex];
-		}
-	}
-
 	StripeSkipList *selectedChunkSkipList = palloc0(sizeof(StripeSkipList));
 	selectedChunkSkipList->chunkSkipNodeArray = selectedChunkSkipNodeArray;
 	selectedChunkSkipList->chunkCount = selectedChunkCount;
 	selectedChunkSkipList->columnCount = stripeSkipList->columnCount;
-	selectedChunkSkipList->chunkGroupRowCounts = chunkGroupRowCounts;
+	selectedChunkSkipList->chunkGroupRowCount = stripeSkipList->chunkGroupRowCount;
 
 	return selectedChunkSkipList;
 }
@@ -930,11 +918,11 @@ StripeSkipListRowCount(StripeSkipList *stripeSkipList)
 {
 	uint32 stripeSkipListRowCount = 0;
 	uint32 chunkIndex = 0;
-	uint32 *chunkGroupRowCounts = stripeSkipList->chunkGroupRowCounts;
+	uint32 chunkGroupRowCount = stripeSkipList->chunkGroupRowCount;
 
+	/* TODO: multiplication */
 	for (chunkIndex = 0; chunkIndex < stripeSkipList->chunkCount; chunkIndex++)
 	{
-		uint32 chunkGroupRowCount = chunkGroupRowCounts[chunkIndex];
 		stripeSkipListRowCount += chunkGroupRowCount;
 	}
 

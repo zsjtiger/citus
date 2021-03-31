@@ -112,7 +112,7 @@ typedef struct ColumnChunkSkipNode
 typedef struct StripeSkipList
 {
 	ColumnChunkSkipNode **chunkSkipNodeArray;
-	uint32 *chunkGroupRowCounts;
+	uint32 chunkGroupRowCount;
 	uint32 columnCount;
 	uint32 chunkCount;
 } StripeSkipList;
@@ -175,7 +175,7 @@ typedef struct StripeBuffers
 	uint32 rowCount;
 	ColumnBuffers **columnBuffersArray;
 
-	uint32 *selectedChunkGroupRowCounts;
+	uint32 stripeChunkGroupRowCount;
 } StripeBuffers;
 
 
@@ -248,7 +248,7 @@ extern void SaveStripeSkipList(RelFileNode relfilenode, uint64 stripe,
 							   StripeSkipList *stripeSkipList,
 							   TupleDesc tupleDescriptor);
 extern void SaveChunkGroups(RelFileNode relfilenode, uint64 stripe,
-							List *chunkGroupRowCounts);
+							uint32 stripeChunkCount);
 extern StripeSkipList * ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe,
 										   TupleDesc tupleDescriptor,
 										   uint32 chunkCount);
