@@ -27,6 +27,7 @@
 #include "columnar/columnar_customscan.h"
 #include "columnar/columnar_metadata.h"
 #include "columnar/columnar_tableam.h"
+#include "distributed/listutils.h"
 
 typedef struct ColumnarScanPath
 {
@@ -55,6 +56,7 @@ static void ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index
 static Path * CreateColumnarScanPath(PlannerInfo *root, RelOptInfo *rel,
 									 RangeTblEntry *rte);
 static Cost ColumnarScanCost(RangeTblEntry *rte);
+static void RemoveNonIndexPaths(RelOptInfo *relOptInfo);
 static Plan * ColumnarScanPath_PlanCustomPath(PlannerInfo *root,
 											  RelOptInfo *rel,
 											  struct CustomPath *best_path,
@@ -138,18 +140,6 @@ columnar_customscan_init()
 
 
 static void
-clear_paths(RelOptInfo *rel)
-{
-	rel->pathlist = NIL;
-	rel->partial_pathlist = NIL;
-	rel->cheapest_startup_path = NULL;
-	rel->cheapest_total_path = NULL;
-	rel->cheapest_unique_path = NULL;
-	rel->cheapest_parameterized_paths = NIL;
-}
-
-
-static void
 ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index rti,
 						   RangeTblEntry *rte)
 {
@@ -188,8 +178,12 @@ ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index rti,
 
 			ereport(DEBUG1, (errmsg("pathlist hook for columnar table am")));
 
-			/* we propose a new path that will be the only path for scanning this relation */
-			clear_paths(rel);
+			/*
+			 * Before adding our custom scan path, remove all the other
+			 * paths other than index scan.
+			 * TODO: we should have a better costing model
+			 */
+			RemoveNonIndexPaths(rel);
 			add_path(rel, customPath);
 		}
 	}
@@ -282,6 +276,28 @@ ColumnarScanCost(RangeTblEntry *rte)
 		Cost scanCost = (double) totalStripeSize / BLCKSZ * selectionRatio;
 		return scanCost;
 	}
+}
+
+
+/*
+ * RemoveNonIndexPaths removes non-IndexPath's from given relOptInfo's
+ * pathlist.
+ */
+static void
+RemoveNonIndexPaths(RelOptInfo *relOptInfo)
+{
+	List *filteredPathList = NIL;
+
+	Path *path = NULL;
+	foreach_ptr(path, relOptInfo->pathlist)
+	{
+		if (IsA(path, IndexPath))
+		{
+			filteredPathList = lappend(filteredPathList, path);
+		}
+	}
+
+	relOptInfo->pathlist = filteredPathList;
 }
 
 
