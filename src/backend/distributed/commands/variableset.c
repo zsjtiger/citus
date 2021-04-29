@@ -72,8 +72,8 @@ ShouldPropagateSetCommand(VariableSetStmt *setStmt)
 		case VAR_SET_MULTI:
 		default:
 		{
-			/* SET (LOCAL) TRANSACTION should be handled locally */
-			return false;
+			/* SET TRANSACTION is similar to SET LOCAL */
+			return strcmp(setStmt->name, "TRANSACTION") == 0;
 		}
 	}
 }
