@@ -26,7 +26,7 @@
 #include "optimizer/planner.h"
 #include "rewrite/rewriteManip.h"
 
-static List * RemoteScanTargetList(List *workerTargetList);
+static List * RemoteScanTargetList(List *workerTargetList, Query *combineQuery);
 static PlannedStmt * BuildSelectStatementViaStdPlanner(Query *combineQuery,
 													   List *remoteScanTargetList,
 													   CustomScan *remoteScan);
@@ -64,7 +64,7 @@ PlanCombineQuery(DistributedPlan *distributedPlan, CustomScan *remoteScan)
 
 	Job *workerJob = distributedPlan->workerJob;
 	List *workerTargetList = workerJob->jobQuery->targetList;
-	List *remoteScanTargetList = RemoteScanTargetList(workerTargetList);
+	List *remoteScanTargetList = RemoteScanTargetList(workerTargetList, combineQuery);
 	return BuildSelectStatementViaStdPlanner(combineQuery, remoteScanTargetList,
 											 remoteScan);
 }
@@ -75,9 +75,10 @@ PlanCombineQuery(DistributedPlan *distributedPlan, CustomScan *remoteScan)
  * a target list for the remote scan on the coordinator node.
  */
 static List *
-RemoteScanTargetList(List *workerTargetList)
+RemoteScanTargetList(List *workerTargetList, Query *combineQuery)
 {
 	List *remoteScanTargetList = NIL;
+	List *aliasList = NIL;
 	const Index tableId = 1;
 	AttrNumber columnId = 1;
 
@@ -86,9 +87,10 @@ RemoteScanTargetList(List *workerTargetList)
 	{
 		TargetEntry *workerTargetEntry = (TargetEntry *) lfirst(workerTargetCell);
 
+		bool addToRemoteScanTargetList = true;
 		if (workerTargetEntry->resjunk)
 		{
-			continue;
+			addToRemoteScanTargetList = false;
 		}
 
 		Var *remoteScanColumn = makeVarFromTargetEntry(tableId, workerTargetEntry);
@@ -111,7 +113,24 @@ RemoteScanTargetList(List *workerTargetList)
 		 */
 		TargetEntry *remoteScanTargetEntry = flatCopyTargetEntry(workerTargetEntry);
 		remoteScanTargetEntry->expr = (Expr *) remoteScanColumn;
+		aliasList = lappend(aliasList, remoteScanTargetEntry);
+		if(addToRemoteScanTargetList)
 		remoteScanTargetList = lappend(remoteScanTargetList, remoteScanTargetEntry);
+	}
+// elog(WARNING, "len: %d", list_length(aliasList));
+	RangeTblEntry *extradataContainerRTE = NULL;
+	FindCitusExtradataContainerRTE((Node *) combineQuery, &extradataContainerRTE);
+	if (extradataContainerRTE != NULL)
+	{
+		/* extract column names from the remoteScanTargetList */
+		List *columnNameList = NIL;
+		TargetEntry *targetEntry = NULL;
+		foreach_ptr(targetEntry, aliasList)
+		{
+			// elog(WARNING, "name: %s", targetEntry->resname);
+			columnNameList = lappend(columnNameList, makeString(targetEntry->resname));
+		}
+		extradataContainerRTE->eref = makeAlias("remote_scan", columnNameList);
 	}
 
 	return remoteScanTargetList;
@@ -260,19 +279,19 @@ BuildSelectStatementViaStdPlanner(Query *combineQuery, List *remoteScanTargetLis
 	 */
 
 	/* find the rangetable entry for the extradata container and overwrite its alias */
-	RangeTblEntry *extradataContainerRTE = NULL;
-	FindCitusExtradataContainerRTE((Node *) combineQuery, &extradataContainerRTE);
-	if (extradataContainerRTE != NULL)
-	{
-		/* extract column names from the remoteScanTargetList */
-		List *columnNameList = NIL;
-		TargetEntry *targetEntry = NULL;
-		foreach_ptr(targetEntry, remoteScanTargetList)
-		{
-			columnNameList = lappend(columnNameList, makeString(targetEntry->resname));
-		}
-		extradataContainerRTE->eref = makeAlias("remote_scan", columnNameList);
-	}
+	// RangeTblEntry *extradataContainerRTE = NULL;
+	// FindCitusExtradataContainerRTE((Node *) combineQuery, &extradataContainerRTE);
+	// if (extradataContainerRTE != NULL)
+	// {
+	// 	/* extract column names from the remoteScanTargetList */
+	// 	List *columnNameList = NIL;
+	// 	TargetEntry *targetEntry = NULL;
+	// 	foreach_ptr(targetEntry, remoteScanTargetList)
+	// 	{
+	// 		columnNameList = lappend(columnNameList, makeString(targetEntry->resname));
+	// 	}
+	// 	extradataContainerRTE->eref = makeAlias("remote_scan", columnNameList);
+	// }
 
 	/*
 	 * Print the combine query at debug level 4. Since serializing the query is relatively

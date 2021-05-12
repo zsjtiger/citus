@@ -438,7 +438,7 @@ push(@pgOptions, "wal_receiver_status_interval=1");
 # src/backend/replication/logical/launcher.c.
 push(@pgOptions, "wal_retrieve_retry_interval=1000");
 
-push(@pgOptions, "log_min_messages=debug4");
+# push(@pgOptions, "log_min_messages=debug4");
 
 
 # Citus options set for the tests

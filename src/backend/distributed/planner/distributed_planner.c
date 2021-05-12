@@ -1651,6 +1651,8 @@ CheckNodeIsDumpable(Node *node)
 static Node *
 CheckNodeCopyAndSerialization(Node *node)
 {
+#include "nodes/print.h"
+	pprint(node);
 #ifdef USE_ASSERT_CHECKING
 	char *out = nodeToString(node);
 	Node *nodeCopy = copyObject(node);
