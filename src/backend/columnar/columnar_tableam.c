@@ -368,6 +368,7 @@ columnar_index_fetch_begin(Relation rel)
 	Oid relfilenode = rel->rd_node.relNode;
 	if (PendingWritesInUpperTransactions(relfilenode, GetCurrentSubTransactionId()))
 	{
+		/* XXX: maybe we can just flush the data and continue */
 		elog(ERROR, "cannot read from index when there is unflushed data in "
 					"upper transactions");
 	}
