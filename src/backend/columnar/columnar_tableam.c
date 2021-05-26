@@ -1084,7 +1084,10 @@ columnar_index_build_range_scan(Relation heapRelation,
 
 	if (start_blockno != 0 || numblocks != InvalidBlockNumber)
 	{
-		/* TODO: make sure that this is only valid for BRIN indexes */
+		/*
+		 * Columnar utility hook already errors out for BRIN indexes on columnar
+		 * tables, but be on the safe side.
+		 */
 		ereport(ERROR, (errmsg("BRIN indexes on columnar tables are not supported")));
 	}
 
@@ -1587,6 +1590,22 @@ ColumnarProcessUtility(PlannedStmt *pstmt,
 				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								errmsg("concurrent index commands are not "
 									   "supported for columnar tables")));
+			}
+
+			RelationClose(rel);
+		}
+
+		/* for now, we don't support index access methods other than btree & hash */
+		if (strncmp(indexStmt->accessMethod, "btree", NAMEDATALEN) != 0 &&
+		    strncmp(indexStmt->accessMethod, "hash", NAMEDATALEN) != 0)
+		{
+			Relation rel = relation_openrv(indexStmt->relation,
+										   ShareLock);
+			if (rel->rd_tableam == GetColumnarTableAmRoutine())
+			{
+				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								errmsg("only btree and hash indexes are supported on "
+									   "columnar tables ")));
 			}
 
 			RelationClose(rel);
