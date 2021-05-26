@@ -185,6 +185,9 @@ ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index rti,
 			 */
 			RemoveNonIndexPaths(rel);
 			add_path(rel, customPath);
+
+			/* re-set cheapest-path related fields */
+			set_cheapest(rel);
 		}
 	}
 	RelationClose(relation);
