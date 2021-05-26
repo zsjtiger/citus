@@ -109,7 +109,6 @@ static List * NeededColumnsList(TupleDesc tupdesc, Bitmapset *attr_needed);
 static void LogRelationStats(Relation rel, int elevel);
 static void TruncateColumnar(Relation rel, int elevel);
 static HeapTuple ColumnarSlotCopyHeapTuple(TupleTableSlot *slot);
-static void ColumnarSlotGetSomeAttrs(TupleTableSlot *slot, int natts);
 static void ColumnarCheckLogicalReplication(Relation rel);
 static Datum * detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isnull);
 static ItemPointerData row_number_to_tid(uint64 rowNumber);
@@ -1389,7 +1388,6 @@ columnar_tableam_init()
 
 	TTSOpsColumnar = TTSOpsVirtual;
 	TTSOpsColumnar.copy_heap_tuple = ColumnarSlotCopyHeapTuple;
-	TTSOpsColumnar.getsomeattrs = ColumnarSlotGetSomeAttrs;
 }
 
 
@@ -1437,19 +1435,6 @@ ColumnarSlotCopyHeapTuple(TupleTableSlot *slot)
 	tuple->t_self = slot->tts_tid;
 
 	return tuple;
-}
-
-
-/*
- * Implementation of TupleTableSlotOps.getsomeattrs for TTSOpsColumnar.
- */
-static void
-ColumnarSlotGetSomeAttrs(TupleTableSlot *slot, int natts)
-{
-	/*
-	 * No-op since values & isNull are already ready to access,
-	 * but some postgres functions might still call this.
-	 */
 }
 
 
