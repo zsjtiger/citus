@@ -157,7 +157,7 @@ s/failed to roll back prepared transaction '.*'/failed to roll back prepared tra
 # "->  <scanMethod> Scan on <tableName>_<partitionId>_<shardId> <tableName>_<aliasId>" and
 # "->  <scanMethod> Scan on <tableName>_<partitionId>_<shardId> <tableName>" becomes
 # "->  <scanMethod> Scan on <tableName>_<partitionId>_<shardId> <tableName>_xxx"
-s/(->.*Scan on\ +)(.*)(_[0-9]+)(_[0-9]+) \2(_[0-9]+|_xxx)?/\1\2\3\4 \2_xxx/g
+s/(->.*Scan on\ +)(.*)(_[0-9]+)(_[0-9]+) (\S*)/\1\2\3\4 \2_xxx/g
 
 # Table aliases for partitioned tables in "Hash Cond:" lines of explain outputs might change
 # This is only for multi_partitioning.sql test file
