@@ -154,6 +154,8 @@ static bool RangeTableArrayContainsAnyRTEIdentities(RangeTblEntry **rangeTableEn
 													rangeTableArrayLength, Relids
 													queryRteIdentities);
 static Relids QueryRteIdentities(Query *queryTree);
+static int NextAttributeEquivalenceId(void);
+static void ResetEquivalenceId(void);
 
 #if PG_VERSION_NUM >= PG_VERSION_13
 static int ParentCountPriorToAppendRel(List *appendRelList, AppendRelInfo *appendRelInfo);
@@ -255,7 +257,7 @@ SafeToPushdownUnionSubquery(PlannerRestrictionContext *plannerRestrictionContext
 		palloc0(sizeof(AttributeEquivalenceClass));
 	ListCell *relationRestrictionCell = NULL;
 
-	attributeEquivalence->equivalenceId = attributeEquivalenceId++;
+	attributeEquivalence->equivalenceId = NextAttributeEquivalenceId();
 
 	/*
 	 * Ensure that the partition column is in the same place across all
@@ -372,6 +374,27 @@ SafeToPushdownUnionSubquery(PlannerRestrictionContext *plannerRestrictionContext
 	}
 
 	return true;
+}
+
+
+/*
+ * NextAttributeEquivalenceId returns the next attribute equivalence id.
+ */
+static int
+NextAttributeEquivalenceId(void)
+{
+	attributeEquivalenceId++;
+	return attributeEquivalenceId;
+}
+
+
+/*
+ * ResetEquivalenceId resets the equivalenceId.
+ */
+static void
+ResetEquivalenceId(void)
+{
+	attributeEquivalenceId = 1;
 }
 
 
@@ -590,7 +613,7 @@ GenerateAllAttributeEquivalences(PlannerRestrictionContext *plannerRestrictionCo
 		plannerRestrictionContext->joinRestrictionContext;
 
 	/* reset the equivalence id counter per call to prevent overflows */
-	attributeEquivalenceId = 1;
+	ResetEquivalenceId();
 
 	List *relationRestrictionAttributeEquivalenceList =
 		GenerateAttributeEquivalencesForRelationRestrictions(relationRestrictionContext);
@@ -774,7 +797,7 @@ AttributeEquivalenceClassForEquivalenceClass(EquivalenceClass *plannerEqClass,
 	ListCell *equivilanceMemberCell = NULL;
 	PlannerInfo *plannerInfo = relationRestriction->plannerInfo;
 
-	attributeEquivalence->equivalenceId = attributeEquivalenceId++;
+	attributeEquivalence->equivalenceId = NextAttributeEquivalenceId();
 
 	foreach(equivilanceMemberCell, plannerEqClass->ec_members)
 	{
@@ -1156,7 +1179,7 @@ GenerateAttributeEquivalencesForJoinRestrictions(JoinRestrictionContext *
 
 			AttributeEquivalenceClass *attributeEquivalence = palloc0(
 				sizeof(AttributeEquivalenceClass));
-			attributeEquivalence->equivalenceId = attributeEquivalenceId++;
+			attributeEquivalence->equivalenceId = NextAttributeEquivalenceId();
 
 			AddToAttributeEquivalenceClass(attributeEquivalence,
 										   joinRestriction->plannerInfo, leftVar);
