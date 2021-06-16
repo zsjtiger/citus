@@ -816,6 +816,7 @@ GatherIndexAndConstraintDefinitionList(Form_pg_index indexForm, List **indexDDLE
 			*indexDDLEventList =
 				lappend(*indexDDLEventList,
 						makeTableDDLCommandString(statementDef));
+			elog(INFO, "statementDef: %s", statementDef);
 		}
 	}
 	else if (indexFlags & INCLUDE_CREATE_INDEX_STATEMENTS)
