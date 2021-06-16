@@ -809,18 +809,24 @@ GatherIndexAndConstraintDefinitionList(Form_pg_index indexForm, List **indexDDLE
 		Oid constraintId = get_index_constraint(indexId);
 		Assert(constraintId != InvalidOid);
 
-		statementDef = pg_get_constraintdef_command(constraintId);
+		if (indexFlags & INCLUDE_CREATE_CONSTRAINT_STATEMENTS)
+		{
+			/* include constraints backed by indexes only when explicitly asked */
+			statementDef = pg_get_constraintdef_command(constraintId);
+			*indexDDLEventList =
+				lappend(*indexDDLEventList,
+						makeTableDDLCommandString(statementDef));
+		}
 	}
-	else
+	else if (indexFlags & INCLUDE_CREATE_INDEX_STATEMENTS)
 	{
+		/*
+		 * Include indexes that are not backing constraints only when
+		 * explicitly asked.
+		 */
 		statementDef = pg_get_indexdef_string(indexId);
-	}
-
-	/* append found constraint or index definition to the list */
-	if (indexFlags & INCLUDE_CREATE_INDEX_STATEMENTS)
-	{
-		*indexDDLEventList = lappend(*indexDDLEventList, makeTableDDLCommandString(
-										 statementDef));
+		*indexDDLEventList = lappend(*indexDDLEventList,
+									 makeTableDDLCommandString(statementDef));
 	}
 
 	/* if table is clustered on this index, append definition to the list */
