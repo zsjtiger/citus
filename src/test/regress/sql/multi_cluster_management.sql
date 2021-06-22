@@ -432,4 +432,7 @@ WHERE logicalrelid = 'test_dist_non_colocated'::regclass GROUP BY nodeport ORDER
 
 SELECT * from master_set_node_property('localhost', :worker_2_port, 'bogusproperty', false);
 
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+
 DROP TABLE test_dist, test_ref, test_dist_colocated, test_dist_non_colocated;
