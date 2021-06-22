@@ -830,6 +830,8 @@ ActivateNode(char *nodeName, int nodePort)
 	WorkerNode *newWorkerNode = SetNodeState(nodeName, nodePort, isActive);
 
 	SetUpDistributedTableDependencies(newWorkerNode);
+
+	StartMetadataSyncToNode(newWorkerNode->workerName, newWorkerNode->workerPort);
 	return newWorkerNode->nodeId;
 }
 
