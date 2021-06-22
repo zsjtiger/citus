@@ -235,5 +235,7 @@ DELETE FROM pg_dist_node;
 SELECT worker_drop_distributed_table(logicalrelid::regclass::text) FROM pg_dist_partition;
 \c - - - :master_port
 ALTER SEQUENCE pg_catalog.pg_dist_colocationid_seq RESTART :last_colocation_id;
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 
 RESET citus.shard_replication_factor;

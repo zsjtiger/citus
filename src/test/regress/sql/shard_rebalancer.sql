@@ -1345,5 +1345,6 @@ SELECT count(*)
 FROM pg_dist_shard
 JOIN pg_dist_shard_placement USING (shardid)
 WHERE logicalrelid = 'r1'::regclass;
-
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 DROP TABLE t1, r1;

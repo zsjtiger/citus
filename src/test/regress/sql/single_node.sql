@@ -1026,3 +1026,6 @@ SELECT 1 FROM master_remove_node('localhost', :master_port);
 -- restart nodeid sequence so that multi_cluster_management still has the same
 -- nodeids
 ALTER SEQUENCE pg_dist_node_nodeid_seq RESTART 1;
+
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);

@@ -687,3 +687,5 @@ INSERT INTO pg_dist_shard_placement (SELECT * FROM tmp_shard_placement);
 DROP TABLE tmp_shard_placement;
 
 DROP SCHEMA replicate_reference_table CASCADE;
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);

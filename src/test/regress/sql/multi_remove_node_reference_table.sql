@@ -626,6 +626,9 @@ DROP SCHEMA remove_node_reference_table_schema CASCADE;
 
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
+
 -- reload pg_dist_shard_placement table
 INSERT INTO pg_dist_shard_placement (SELECT * FROM tmp_shard_placement);
 DROP TABLE tmp_shard_placement;

@@ -487,7 +487,7 @@ SELECT right(table_name, 7)::int as shardid, * FROM (
 				table_name, constraint_name, constraint_type
 			FROM information_schema.table_constraints
 			WHERE
-				table_name LIKE 'partitioning_hash_test%' AND
+				table_name LIKE 'partitioning_hash_test_%' AND
 				constraint_type = 'FOREIGN KEY'
 			ORDER BY 1, 2, 3
 			) q

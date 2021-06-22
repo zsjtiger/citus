@@ -173,3 +173,5 @@ SELECT run_command_on_workers('DROP USER database_owner_1');
 SELECT run_command_on_workers('DROP USER database_owner_2');
 SET client_min_messages TO warning;
 DROP SCHEMA alter_database_owner CASCADE;
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);

@@ -42,7 +42,8 @@ WHERE name = 'uuid-ossp'
 
 -- and add the other node
 SELECT 1 from master_add_node('localhost', :worker_2_port);
-
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 -- show that the extension exists on both nodes
 SELECT run_command_on_workers($$SELECT count(*) FROM pg_extension WHERE extname = 'uuid-ossp'$$);
 
