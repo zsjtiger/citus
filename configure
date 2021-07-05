@@ -4154,6 +4154,162 @@ if test x"$citusac_cv_prog_cc_cflags__Wmissing_prototypes" = x"yes"; then
   CITUS_CFLAGS="$CITUS_CFLAGS -Wmissing-prototypes"
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wnull-dereference" >&5
+$as_echo_n "checking whether $CC supports -Wnull-dereference... " >&6; }
+if ${citusac_cv_prog_cc_cflags__Wnull_dereference+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  citusac_save_CFLAGS=$CFLAGS
+flag=-Wnull-dereference
+case $flag in -Wno*)
+	 flag=-W$(echo $flag | cut -c 6-)
+esac
+CFLAGS="$citusac_save_CFLAGS $flag"
+ac_save_c_werror_flag=$ac_c_werror_flag
+ac_c_werror_flag=yes
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  citusac_cv_prog_cc_cflags__Wnull_dereference=yes
+else
+  citusac_cv_prog_cc_cflags__Wnull_dereference=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ac_c_werror_flag=$ac_save_c_werror_flag
+CFLAGS="$citusac_save_CFLAGS"
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $citusac_cv_prog_cc_cflags__Wnull_dereference" >&5
+$as_echo "$citusac_cv_prog_cc_cflags__Wnull_dereference" >&6; }
+if test x"$citusac_cv_prog_cc_cflags__Wnull_dereference" = x"yes"; then
+  CITUS_CFLAGS="$CITUS_CFLAGS -Wnull-dereference"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wduplicated-cond" >&5
+$as_echo_n "checking whether $CC supports -Wduplicated-cond... " >&6; }
+if ${citusac_cv_prog_cc_cflags__Wduplicated_cond+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  citusac_save_CFLAGS=$CFLAGS
+flag=-Wduplicated-cond
+case $flag in -Wno*)
+	 flag=-W$(echo $flag | cut -c 6-)
+esac
+CFLAGS="$citusac_save_CFLAGS $flag"
+ac_save_c_werror_flag=$ac_c_werror_flag
+ac_c_werror_flag=yes
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  citusac_cv_prog_cc_cflags__Wduplicated_cond=yes
+else
+  citusac_cv_prog_cc_cflags__Wduplicated_cond=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ac_c_werror_flag=$ac_save_c_werror_flag
+CFLAGS="$citusac_save_CFLAGS"
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $citusac_cv_prog_cc_cflags__Wduplicated_cond" >&5
+$as_echo "$citusac_cv_prog_cc_cflags__Wduplicated_cond" >&6; }
+if test x"$citusac_cv_prog_cc_cflags__Wduplicated_cond" = x"yes"; then
+  CITUS_CFLAGS="$CITUS_CFLAGS -Wduplicated-cond"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wlogical-op" >&5
+$as_echo_n "checking whether $CC supports -Wlogical-op... " >&6; }
+if ${citusac_cv_prog_cc_cflags__Wlogical_op+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  citusac_save_CFLAGS=$CFLAGS
+flag=-Wlogical-op
+case $flag in -Wno*)
+	 flag=-W$(echo $flag | cut -c 6-)
+esac
+CFLAGS="$citusac_save_CFLAGS $flag"
+ac_save_c_werror_flag=$ac_c_werror_flag
+ac_c_werror_flag=yes
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  citusac_cv_prog_cc_cflags__Wlogical_op=yes
+else
+  citusac_cv_prog_cc_cflags__Wlogical_op=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ac_c_werror_flag=$ac_save_c_werror_flag
+CFLAGS="$citusac_save_CFLAGS"
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $citusac_cv_prog_cc_cflags__Wlogical_op" >&5
+$as_echo "$citusac_cv_prog_cc_cflags__Wlogical_op" >&6; }
+if test x"$citusac_cv_prog_cc_cflags__Wlogical_op" = x"yes"; then
+  CITUS_CFLAGS="$CITUS_CFLAGS -Wlogical-op"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wjump-misses-init" >&5
+$as_echo_n "checking whether $CC supports -Wjump-misses-init... " >&6; }
+if ${citusac_cv_prog_cc_cflags__Wjump_misses_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  citusac_save_CFLAGS=$CFLAGS
+flag=-Wjump-misses-init
+case $flag in -Wno*)
+	 flag=-W$(echo $flag | cut -c 6-)
+esac
+CFLAGS="$citusac_save_CFLAGS $flag"
+ac_save_c_werror_flag=$ac_c_werror_flag
+ac_c_werror_flag=yes
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  citusac_cv_prog_cc_cflags__Wjump_misses_init=yes
+else
+  citusac_cv_prog_cc_cflags__Wjump_misses_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ac_c_werror_flag=$ac_save_c_werror_flag
+CFLAGS="$citusac_save_CFLAGS"
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $citusac_cv_prog_cc_cflags__Wjump_misses_init" >&5
+$as_echo "$citusac_cv_prog_cc_cflags__Wjump_misses_init" >&6; }
+if test x"$citusac_cv_prog_cc_cflags__Wjump_misses_init" = x"yes"; then
+  CITUS_CFLAGS="$CITUS_CFLAGS -Wjump-misses-init"
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wshadow" >&5
 $as_echo_n "checking whether $CC supports -Wshadow... " >&6; }
 if ${citusac_cv_prog_cc_cflags__Wshadow+:} false; then :
