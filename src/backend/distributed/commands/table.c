@@ -534,7 +534,7 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand,
 	 * another relation here.
 	 */
 	char leftRelationKind = get_rel_relkind(leftRelationId);
-	if (leftRelationKind == RELKIND_INDEX)
+	if (leftRelationKind == RELKIND_INDEX || leftRelationKind == RELKIND_PARTITIONED_INDEX)
 	{
 		bool missingOk = false;
 		leftRelationId = IndexGetRelation(leftRelationId, missingOk);
@@ -597,7 +597,7 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand,
 	 * we have a special implementation for ALTER INDEX, and a specific error
 	 * message in case of unsupported sub-command.
 	 */
-	if (leftRelationKind == RELKIND_INDEX)
+	if (leftRelationKind == RELKIND_INDEX || leftRelationKind == RELKIND_PARTITIONED_INDEX)
 	{
 		ErrorIfUnsupportedAlterIndexStmt(alterTableStatement);
 	}
@@ -821,21 +821,36 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand,
 			PartitionCmd *partitionCommand = (PartitionCmd *) command->def;
 
 			/*
-			 * We only support ALTER TABLE ATTACH PARTITION, if it is only subcommand of
-			 * ALTER TABLE. It was already checked in ErrorIfUnsupportedAlterTableStmt.
+			 * We support ALTER TABLE ATTACH PARTITION and ALTER INDEX ATTACH PARTITION
+			 * if it is only subcommand of ALTER TABLE command.
+			 * It was already checked in ErrorIfUnsupportedAlterTableStmt.
 			 */
 			Assert(list_length(commandList) <= 1);
 
 			rightRelationId = RangeVarGetRelid(partitionCommand->name, NoLock, false);
+			char rightRelationKind = get_rel_relkind(rightRelationId);
 
 			/*
-			 * Do not generate tasks if relation is distributed and the partition
-			 * is not distributed. Because, we'll manually convert the partition into
-			 * distributed table and co-locate with its parent.
+			 * If the command is ALTER INDEX ATTACH PARTITION, then the right relation is index.
+			 * So we shouls use the relation of that index created against.
+			 * 
 			 */
-			if (!IsCitusTable(rightRelationId))
+			if (rightRelationKind == RELKIND_INDEX)
 			{
-				return NIL;
+				bool missingOk = false;
+				rightRelationId = IndexGetRelation(rightRelationId, missingOk);
+			}
+			else
+			{
+				/*
+				* Do not generate tasks if relation is distributed and the partition
+				* is not distributed. Because, we'll manually convert the partition into
+				* distributed table and co-locate with its parent.
+				*/
+				if (!IsCitusTable(rightRelationId))
+				{
+					return NIL;
+				}
 			}
 		}
 		else if (alterTableType == AT_DetachPartition)

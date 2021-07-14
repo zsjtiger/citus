@@ -810,6 +810,7 @@ ErrorIfUnsupportedAlterIndexStmt(AlterTableStmt *alterTableStatement)
 			case AT_ResetRelOptions:    /* RESET (...) */
 			case AT_ReplaceRelOptions:  /* replace entire option list */
 			case AT_SetStatistics:  /* SET STATISTICS */
+			case AT_AttachPartition: /* ATTACH PARTITION */
 			{
 				/* this command is supported by Citus */
 				break;
