@@ -173,6 +173,7 @@
 #include "utils/timestamp.h"
 
 #define SLOW_START_DISABLED 0
+#define WAIT_EVENT_SET_INDEX_NOT_INITIALIZED -1
 
 
 /*
@@ -610,6 +611,10 @@ static int UsableConnectionCount(WorkerPool *workerPool);
 static long NextEventTimeout(DistributedExecution *execution);
 static WaitEventSet * BuildWaitEventSet(List *sessionList);
 static void RebuildWaitEventSetFlags(WaitEventSet *waitEventSet, List *sessionList);
+static int CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
+									 Latch *latch, void *user_data);
+static bool CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events,
+								 Latch *latch);
 static TaskPlacementExecution * PopPlacementExecution(WorkerSession *session);
 static TaskPlacementExecution * PopAssignedPlacementExecution(WorkerSession *session);
 static TaskPlacementExecution * PopUnassignedPlacementExecution(WorkerPool *workerPool);
@@ -4390,15 +4395,60 @@ BuildWaitEventSet(List *sessionList)
 			continue;
 		}
 
-		int waitEventSetIndex = AddWaitEventToSet(waitEventSet, connection->waitFlags,
-												  sock, NULL, (void *) session);
+		if (session->waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
+		{
+			/* should not happen, already removed from the waitEventSet */
+			continue;
+		}
+
+		int waitEventSetIndex =
+			CitusAddWaitEventSetToSet(waitEventSet, connection->waitFlags, sock,
+									  NULL, (void *) session);
 		session->waitEventSetIndex = waitEventSetIndex;
+
+		if (waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
+		{
+			connection->connectionState = MULTI_CONNECTION_LOST;
+		}
 	}
 
-	AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL, NULL);
-	AddWaitEventToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch, NULL);
+	CitusAddWaitEventSetToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL,
+							  NULL);
+	CitusAddWaitEventSetToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch,
+							  NULL);
 
 	return waitEventSet;
+}
+
+
+/*
+ * CitusAddWaitEventSetToSet is a wrapper around Postgres' AddWaitEventToSet().
+ *
+ * AddWaitEventToSet() may throw hard errors. For example, when the
+ * underlying socket for a connection is closed by the remote server
+ * and already reflected by the OS, however Citus hasn't had a chance
+ * to get this information. In that case, if replication factor is >1,
+ * Citus can failover to other nodes for executing the query. Even if
+ * replication factor = 1, Citus can give much nicer errors.
+ *
+ * So CitusAddWaitEventSetToSet simply puts ModifyWaitEvent into a
+ * PG_TRY/PG_CATCH block in order to catch any hard errors, and
+ * returns this information to the caller.
+ */
+static int
+CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
+						  Latch *latch, void *user_data)
+{
+	static volatile int waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
+
+	PG_TRY();
+	{
+		waitEventSetIndex =
+			AddWaitEventToSet(set, events, fd, latch, (void *) user_data);
+	}
+	PG_END_TRY();
+
+	return waitEventSetIndex;
 }
 
 
@@ -4445,8 +4495,47 @@ RebuildWaitEventSetFlags(WaitEventSet *waitEventSet, List *sessionList)
 			continue;
 		}
 
-		ModifyWaitEvent(waitEventSet, waitEventSetIndex, connection->waitFlags, NULL);
+		bool success =
+			CitusModifyWaitEvent(waitEventSet, waitEventSetIndex,
+								 connection->waitFlags, NULL);
+		if (!success)
+		{
+			connection->connectionState = MULTI_CONNECTION_LOST;
+		}
 	}
+}
+
+
+/*
+ * CitusModifyWaitEvent is a wrapper around Postgres' ModifyWaitEvent().
+ *
+ * ModifyWaitEvent may throw hard errors. For example, when the underlying
+ * socket for a connection is closed by the remote server and already
+ * reflected by the OS, however Citus hasn't had a chance to get this
+ * information. In that case, if repliction factor is >1, Citus can
+ * failover to other nodes for executing the query. Even if replication
+ * factor = 1, Citus can give much nicer errors.
+ *
+ * So CitusModifyWaitEvent simply puts ModifyWaitEvent into a PG_TRY/PG_CATCH
+ * block in order to catch any hard errors, and returns this information to the
+ * caller.
+ */
+static bool
+CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
+{
+	static volatile bool success = true;
+
+	PG_TRY();
+	{
+		ModifyWaitEvent(set, pos, events, latch);
+	}
+	PG_CATCH();
+	{
+		success = false;
+	}
+	PG_END_TRY();
+
+	return success;
 }
 
 
