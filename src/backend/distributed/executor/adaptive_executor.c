@@ -4352,6 +4352,9 @@ TaskExecutionStateMachine(ShardCommandExecution *shardCommandExecution)
 }
 
 
+static int CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
+									 Latch *latch, void *user_data);
+
 /*
  * BuildWaitEventSet creates a WaitEventSet for the given array of connections
  * which can be used to wait for any of the sockets to become read-ready or
@@ -4390,15 +4393,39 @@ BuildWaitEventSet(List *sessionList)
 			continue;
 		}
 
-		int waitEventSetIndex = AddWaitEventToSet(waitEventSet, connection->waitFlags,
-												  sock, NULL, (void *) session);
+		int waitEventSetIndex = CitusAddWaitEventSetToSet(waitEventSet,
+														  connection->waitFlags,
+														  sock, NULL, (void *) session);
+		if (waitEventSetIndex == -1)
+		{
+			connection->connectionState = MULTI_CONNECTION_LOST;
+		}
 		session->waitEventSetIndex = waitEventSetIndex;
 	}
 
-	AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL, NULL);
-	AddWaitEventToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch, NULL);
+	CitusAddWaitEventSetToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL,
+							  NULL);
+	CitusAddWaitEventSetToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch,
+							  NULL);
 
 	return waitEventSet;
+}
+
+
+static int
+CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
+						  Latch *latch, void *user_data)
+{
+	static volatile int waitEventSetIndex = -1;
+
+	PG_TRY();
+	{
+		waitEventSetIndex = AddWaitEventToSet(set, events,
+											  fd, latch, (void *) user_data);
+	}
+	PG_END_TRY();
+
+	return waitEventSetIndex;
 }
 
 
@@ -4412,6 +4439,8 @@ GetEventSetSize(List *sessionList)
 	return list_length(sessionList) + 2;
 }
 
+
+static bool CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch);
 
 /*
  * RebuildWaitEventSetFlags modifies the given waitEventSet with the wait flags
@@ -4445,8 +4474,33 @@ RebuildWaitEventSetFlags(WaitEventSet *waitEventSet, List *sessionList)
 			continue;
 		}
 
-		ModifyWaitEvent(waitEventSet, waitEventSetIndex, connection->waitFlags, NULL);
+		bool success =
+			CitusModifyWaitEvent(waitEventSet, waitEventSetIndex,
+								 connection->waitFlags, NULL);
+		if (!success)
+		{
+			connection->connectionState = MULTI_CONNECTION_LOST;
+		}
 	}
+}
+
+
+static bool
+CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
+{
+	static volatile bool success = true;
+
+	PG_TRY();
+	{
+		ModifyWaitEvent(set, pos, events, latch);
+	}
+	PG_CATCH();
+	{
+		success = false;
+	}
+	PG_END_TRY();
+
+	return success;
 }
 
 
