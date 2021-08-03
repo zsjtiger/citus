@@ -4352,6 +4352,8 @@ TaskExecutionStateMachine(ShardCommandExecution *shardCommandExecution)
 }
 
 
+#define WAIT_EVENT_SET_INDEX_NOT_INITIALIZED -1
+
 static int CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 									 Latch *latch, void *user_data);
 
@@ -4393,10 +4395,15 @@ BuildWaitEventSet(List *sessionList)
 			continue;
 		}
 
+		if (session->waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
+		{
+			continue;
+		}
+
 		int waitEventSetIndex = CitusAddWaitEventSetToSet(waitEventSet,
 														  connection->waitFlags,
 														  sock, NULL, (void *) session);
-		if (waitEventSetIndex == -1)
+		if (waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
 		{
 			connection->connectionState = MULTI_CONNECTION_LOST;
 		}
@@ -4416,7 +4423,7 @@ static int
 CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 						  Latch *latch, void *user_data)
 {
-	static volatile int waitEventSetIndex = -1;
+	static volatile int waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
 
 	PG_TRY();
 	{
