@@ -174,6 +174,7 @@
 
 #define SLOW_START_DISABLED 0
 #define WAIT_EVENT_SET_INDEX_NOT_INITIALIZED -1
+#define WAIT_EVENT_SET_INDEX_FAILED -2
 
 
 /*
@@ -643,6 +644,8 @@ static void ExtractParametersForRemoteExecution(ParamListInfo paramListInfo,
 												Oid **parameterTypes,
 												const char ***parameterValues);
 static int GetEventSetSize(List *sessionList);
+static void ProcessSessionsWithFailedWaitEventSetOperations(
+	DistributedExecution *execution);
 static int RebuildWaitEventSet(DistributedExecution *execution);
 static void ProcessWaitEvents(DistributedExecution *execution, WaitEvent *events, int
 							  eventCount, bool *cancellationReceived);
@@ -2145,6 +2148,7 @@ FindOrCreateWorkerSession(WorkerPool *workerPool, MultiConnection *connection)
 	session->connection = connection;
 	session->workerPool = workerPool;
 	session->commandsSent = 0;
+	session->waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
 
 	dlist_init(&session->pendingTaskQueue);
 	dlist_init(&session->readyTaskQueue);
@@ -2306,11 +2310,15 @@ RunDistributedExecution(DistributedExecution *execution)
 				eventSetSize = RebuildWaitEventSet(execution);
 
 				events = palloc0(eventSetSize * sizeof(WaitEvent));
+
+				ProcessSessionsWithFailedWaitEventSetOperations(execution);
 			}
 			else if (execution->waitFlagsChanged)
 			{
 				RebuildWaitEventSetFlags(execution->waitEventSet, execution->sessionList);
 				execution->waitFlagsChanged = false;
+
+				ProcessSessionsWithFailedWaitEventSetOperations(execution);
 			}
 
 			/* wait for I/O events */
@@ -2355,6 +2363,44 @@ RunDistributedExecution(DistributedExecution *execution)
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
+}
+
+
+/*
+ * ProcessSessionsWithFailedEventSetOperations goes over the session list and
+ * processes sessions with failed wait event set operations.
+ *
+ * Failed sessions are not going to generate any further events, so it is our
+ * only chance to process the failure by calling into `ConnectionStateMachine`.
+ */
+static void
+ProcessSessionsWithFailedWaitEventSetOperations(DistributedExecution *execution)
+{
+	WorkerSession *session = NULL;
+	foreach_ptr(session, execution->sessionList)
+	{
+		if (session->waitEventSetIndex == WAIT_EVENT_SET_INDEX_FAILED)
+		{
+			/*
+			 * We can only lost only already connected connections,
+			 * others are regular failures.
+			 */
+			MultiConnection *connection = session->connection;
+			if (connection->connectionState == MULTI_CONNECTION_CONNECTED)
+			{
+				connection->connectionState = MULTI_CONNECTION_LOST;
+			}
+			else
+			{
+				connection->connectionState = MULTI_CONNECTION_FAILED;
+			}
+
+
+			ConnectionStateMachine(session);
+
+			session->waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
+		}
+	}
 }
 
 
@@ -4395,21 +4441,10 @@ BuildWaitEventSet(List *sessionList)
 			continue;
 		}
 
-		if (session->waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
-		{
-			/* should not happen, already removed from the waitEventSet */
-			continue;
-		}
-
 		int waitEventSetIndex =
 			CitusAddWaitEventSetToSet(waitEventSet, connection->waitFlags, sock,
 									  NULL, (void *) session);
 		session->waitEventSetIndex = waitEventSetIndex;
-
-		if (waitEventSetIndex == WAIT_EVENT_SET_INDEX_NOT_INITIALIZED)
-		{
-			connection->connectionState = MULTI_CONNECTION_LOST;
-		}
 	}
 
 	CitusAddWaitEventSetToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL,
@@ -4445,6 +4480,24 @@ CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 	{
 		waitEventSetIndex =
 			AddWaitEventToSet(set, events, fd, latch, (void *) user_data);
+	}
+	PG_CATCH();
+	{
+		FlushErrorState();
+
+		if (user_data != NULL)
+		{
+			WorkerSession *workerSession = (WorkerSession *) user_data;
+
+			ereport(DEBUG1, (errcode(ERRCODE_CONNECTION_FAILURE),
+							 errmsg("Adding wait event for node %s:%d failed. "
+									"The socket was: %d",
+									workerSession->workerPool->nodeName,
+									workerSession->workerPool->nodePort, fd)));
+		}
+
+		/* let the callers know about the failure */
+		waitEventSetIndex = WAIT_EVENT_SET_INDEX_FAILED;
 	}
 	PG_END_TRY();
 
@@ -4500,7 +4553,13 @@ RebuildWaitEventSetFlags(WaitEventSet *waitEventSet, List *sessionList)
 								 connection->waitFlags, NULL);
 		if (!success)
 		{
-			connection->connectionState = MULTI_CONNECTION_LOST;
+			ereport(DEBUG1, (errcode(ERRCODE_CONNECTION_FAILURE),
+							 errmsg("Modifying wait event for node %s:%d failed. "
+									"The wait event index was: %d",
+									connection->hostname, connection->port,
+									waitEventSetIndex)));
+
+			session->waitEventSetIndex = WAIT_EVENT_SET_INDEX_FAILED;
 		}
 	}
 }
@@ -4531,6 +4590,9 @@ CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
 	}
 	PG_CATCH();
 	{
+		FlushErrorState();
+
+		/* let the callers know about the failure */
 		success = false;
 	}
 	PG_END_TRY();
