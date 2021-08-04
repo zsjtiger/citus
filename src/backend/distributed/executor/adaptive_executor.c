@@ -4439,7 +4439,7 @@ static int
 CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 						  Latch *latch, void *user_data)
 {
-	static volatile int waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
+	volatile int waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
 
 	PG_TRY();
 	{
@@ -4523,7 +4523,7 @@ RebuildWaitEventSetFlags(WaitEventSet *waitEventSet, List *sessionList)
 static bool
 CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
 {
-	static volatile bool success = true;
+	volatile bool success = true;
 
 	PG_TRY();
 	{
