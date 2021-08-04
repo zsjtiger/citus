@@ -644,7 +644,7 @@ static void ExtractParametersForRemoteExecution(ParamListInfo paramListInfo,
 												Oid **parameterTypes,
 												const char ***parameterValues);
 static int GetEventSetSize(List *sessionList);
-static void ProcessSessionsWithFailedWaitEventSetOperations(
+static bool ProcessSessionsWithFailedWaitEventSetOperations(
 	DistributedExecution *execution);
 static int RebuildWaitEventSet(DistributedExecution *execution);
 static void ProcessWaitEvents(DistributedExecution *execution, WaitEvent *events, int
@@ -2296,6 +2296,8 @@ RunDistributedExecution(DistributedExecution *execution)
 				ManageWorkerPool(workerPool);
 			}
 
+
+			bool skipWaitEvents = false;
 			if (execution->rebuildWaitEventSet)
 			{
 				if (events != NULL)
@@ -2311,14 +2313,27 @@ RunDistributedExecution(DistributedExecution *execution)
 
 				events = palloc0(eventSetSize * sizeof(WaitEvent));
 
-				ProcessSessionsWithFailedWaitEventSetOperations(execution);
+				skipWaitEvents =
+					ProcessSessionsWithFailedWaitEventSetOperations(execution);
 			}
 			else if (execution->waitFlagsChanged)
 			{
 				RebuildWaitEventSetFlags(execution->waitEventSet, execution->sessionList);
 				execution->waitFlagsChanged = false;
 
-				ProcessSessionsWithFailedWaitEventSetOperations(execution);
+				skipWaitEvents =
+					ProcessSessionsWithFailedWaitEventSetOperations(execution);
+			}
+
+			if (skipWaitEvents)
+			{
+				/*
+				 * Some operation on the wait event set is failed, retry
+				 * as we already removed the problematic connections.
+				 */
+				execution->rebuildWaitEventSet = true;
+
+				continue;
 			}
 
 			/* wait for I/O events */
@@ -2372,10 +2387,13 @@ RunDistributedExecution(DistributedExecution *execution)
  *
  * Failed sessions are not going to generate any further events, so it is our
  * only chance to process the failure by calling into `ConnectionStateMachine`.
+ *
+ * The function returns true if any session failed.
  */
-static void
+static bool
 ProcessSessionsWithFailedWaitEventSetOperations(DistributedExecution *execution)
 {
+	bool foundFailedSession = false;
 	WorkerSession *session = NULL;
 	foreach_ptr(session, execution->sessionList)
 	{
@@ -2399,8 +2417,12 @@ ProcessSessionsWithFailedWaitEventSetOperations(DistributedExecution *execution)
 			ConnectionStateMachine(session);
 
 			session->waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
+
+			foundFailedSession = true;
 		}
 	}
+
+	return foundFailedSession;
 }
 
 
@@ -4475,6 +4497,7 @@ CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 						  Latch *latch, void *user_data)
 {
 	volatile int waitEventSetIndex = WAIT_EVENT_SET_INDEX_NOT_INITIALIZED;
+	MemoryContext savedContext = CurrentMemoryContext;
 
 	PG_TRY();
 	{
@@ -4483,6 +4506,14 @@ CitusAddWaitEventSetToSet(WaitEventSet *set, uint32 events, pgsocket fd,
 	}
 	PG_CATCH();
 	{
+		/*
+		 * We might be in an arbitrary memory context when the
+		 * error is thrown and we should get back to one we had
+		 * at PG_TRY() time, especially because we are not
+		 * re-throwing the error.
+		 */
+		MemoryContextSwitchTo(savedContext);
+
 		FlushErrorState();
 
 		if (user_data != NULL)
@@ -4583,6 +4614,7 @@ static bool
 CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
 {
 	volatile bool success = true;
+	MemoryContext savedContext = CurrentMemoryContext;
 
 	PG_TRY();
 	{
@@ -4590,6 +4622,14 @@ CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
 	}
 	PG_CATCH();
 	{
+		/*
+		 * We might be in an arbitrary memory context when the
+		 * error is thrown and we should get back to one we had
+		 * at PG_TRY() time, especially because we are not
+		 * re-throwing the error.
+		 */
+		MemoryContextSwitchTo(savedContext);
+
 		FlushErrorState();
 
 		/* let the callers know about the failure */
