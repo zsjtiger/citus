@@ -256,6 +256,8 @@ MultiConnection *
 StartNodeUserDatabaseConnection(uint32 flags, const char *hostname, int32 port,
 								const char *user, const char *database)
 {
+	ereport(ERROR, (errmsg("throw an error as postgres could do")));
+
 	ConnectionHashKey key;
 	bool found;
 
