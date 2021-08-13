@@ -298,6 +298,9 @@ CheckTableSchemaNameForDrop(Oid relationId, char **schemaName, char **tableName)
  * we do delete the shard metadadata.
  */
 #include "distributed/adaptive_executor.h"
+#include "distributed/relation_access_tracking.h"
+#include "distributed/multi_executor.h"
+
 static int
 DropShards(Oid relationId, char *schemaName, char *relationName,
 		   List *deletableShardIntervalList)
@@ -308,38 +311,73 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 
 	List *dropTaskList = DropTaskList(relationId, schemaName, relationName,
 									  deletableShardIntervalList);
-	List *dropTaskList2 = NIL;
 	int32 localGroupId = GetLocalGroupId();
 
 	Task *task = NULL;
 	foreach_ptr(task, dropTaskList)
 	{
-		uint64 shardId = task->anchorShardId;
-
 		ShardPlacement *shardPlacement = NULL;
+		List *newPlacementList = NIL;
 		foreach_ptr(shardPlacement, task->taskPlacementList)
 		{
-			uint64 shardPlacementId = shardPlacement->placementId;
 			int32 shardPlacementGroupId = shardPlacement->groupId;
 
 			bool isLocalShardPlacement = (shardPlacementGroupId == localGroupId);
 
-
-			DeleteShardPlacementRow(shardPlacementId);
-
-
 			if (isLocalShardPlacement && DropSchemaOrDBInProgress() &&
 				localGroupId == COORDINATOR_GROUP_ID)
 			{
+				elog(INFO, "skip drop");
 				continue;
 			}
-			dropTaskList2 = lappend(dropTaskList2, task);
-		}
 
-		DeleteShardRow(shardId);
+			newPlacementList = lappend(newPlacementList, shardPlacement);
+		}
+		task->taskPlacementList = newPlacementList;
 	}
 
-	ExecuteUtilityTaskList(dropTaskList2, true);
+	{
+		if (ParallelQueryExecutedInTransaction())
+		{
+			/*
+			 * If there has already been a parallel query executed, the sequential mode
+			 * would still use the already opened parallel connections to the workers,
+			 * thus contradicting our purpose of using sequential mode.
+			 */
+			ereport(ERROR, (errmsg(
+								"Shard name (%s) for table (%s) is too long and could "
+								"lead to deadlocks when executed in a transaction "
+								"block after a parallel query", "onder",
+								relationName),
+							errhint("Try re-running the transaction with "
+									"\"SET LOCAL citus.multi_shard_modify_mode TO "
+									"\'sequential\';\"")));
+		}
+		else
+		{
+			elog(DEBUG1, "the name of the shard (%s) for relation (%s) is too long, "
+						 "switching to sequential and local execution mode to prevent "
+						 "self deadlocks",
+				 "onder", relationName);
+
+			SetLocalMultiShardModifyModeToSequential();
+			SetLocalExecutionStatus(LOCAL_EXECUTION_REQUIRED);
+		}
+	}
+
+	ExecuteUtilityTaskList(dropTaskList, true);
+
+	task = NULL;
+	foreach_ptr(task, dropTaskList)
+	{
+		ShardPlacement *shardPlacement = NULL;
+		foreach_ptr(shardPlacement, task->taskPlacementList)
+		{
+			DeleteShardPlacementRow(shardPlacement->placementId);
+		}
+
+		DeleteShardRow(task->anchorShardId);
+	}
 
 
 	int droppedShardCount = list_length(deletableShardIntervalList);
