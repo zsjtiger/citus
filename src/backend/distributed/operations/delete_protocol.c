@@ -78,9 +78,6 @@ static int DropShards(Oid relationId, char *schemaName, char *relationName,
 					  List *deletableShardIntervalList);
 static List * DropTaskList(Oid relationId, char *schemaName, char *relationName,
 						   List *deletableShardIntervalList);
-static void ExecuteDropShardPlacementCommandRemotely(ShardPlacement *shardPlacement,
-													 const char *shardRelationName,
-													 const char *dropShardPlacementCommand);
 static char * CreateDropShardPlacementCommand(const char *schemaName,
 											  const char *shardRelationName,
 											  char storageType);
@@ -300,6 +297,7 @@ CheckTableSchemaNameForDrop(Oid relationId, char **schemaName, char **tableName)
  * We mark shard placements that we couldn't drop as to be deleted later, but
  * we do delete the shard metadadata.
  */
+#include "distributed/multi_executor.h"
 static int
 DropShards(Oid relationId, char *schemaName, char *relationName,
 		   List *deletableShardIntervalList)
@@ -308,29 +306,10 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 	Assert(schemaName != NULL);
 	Assert(relationName != NULL);
 
-	UseCoordinatedTransaction();
-
-	/*
-	 * We will use below variable accross this function to decide if we can
-	 * use local execution
-	 */
-	int32 localGroupId = GetLocalGroupId();
-
-	/* DROP table commands are currently only supported from the coordinator */
-	Assert(localGroupId == COORDINATOR_GROUP_ID);
-
-	/*
-	 * At this point we intentionally decided to not use 2PC for reference
-	 * tables
-	 */
-	if (MultiShardCommitProtocol == COMMIT_PROTOCOL_2PC)
-	{
-		Use2PCForCoordinatedTransaction();
-	}
-
 	List *dropTaskList = DropTaskList(relationId, schemaName, relationName,
 									  deletableShardIntervalList);
-	bool shouldExecuteTasksLocally = ShouldExecuteTasksLocally(dropTaskList);
+
+	ExecuteTaskListIntoTupleDest(ROW_MODIFY_NONCOMMUTATIVE, dropTaskList, CreateTupleDestNone(), false);
 
 	Task *task = NULL;
 	foreach_ptr(task, dropTaskList)
@@ -341,65 +320,10 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 		foreach_ptr(shardPlacement, task->taskPlacementList)
 		{
 			uint64 shardPlacementId = shardPlacement->placementId;
-			int32 shardPlacementGroupId = shardPlacement->groupId;
-
-			bool isLocalShardPlacement = (shardPlacementGroupId == localGroupId);
-
-			if (isLocalShardPlacement && DropSchemaOrDBInProgress() &&
-				localGroupId == COORDINATOR_GROUP_ID)
-			{
-				/*
-				 * The active DROP SCHEMA/DATABASE ... CASCADE will drop the
-				 * shard, if we try to drop it over another connection, we will
-				 * get into a distributed deadlock. Hence, just delete the shard
-				 * placement metadata and skip it for now.
-				 */
-				DeleteShardPlacementRow(shardPlacementId);
-				continue;
-			}
-
-			/*
-			 * If it is a local placement of a distributed table or a reference table,
-			 * then execute the DROP command locally.
-			 */
-			if (isLocalShardPlacement && shouldExecuteTasksLocally)
-			{
-				List *singleTaskList = list_make1(task);
-
-				ExecuteLocalUtilityTaskList(singleTaskList);
-			}
-			else
-			{
-				/*
-				 * Either it was not a local placement or we could not use
-				 * local execution even if it was a local placement.
-				 * If it is the second case, then it is possibly because in
-				 * current transaction, some commands or queries connected
-				 * to local group as well.
-				 *
-				 * Regardless of the node is a remote node or the current node,
-				 * try to open a new connection (or use an existing one) to
-				 * connect to that node to drop the shard placement over that
-				 * remote connection.
-				 */
-				const char *dropShardPlacementCommand = TaskQueryString(task);
-				ExecuteDropShardPlacementCommandRemotely(shardPlacement,
-														 relationName,
-														 dropShardPlacementCommand);
-
-				if (isLocalShardPlacement)
-				{
-					SetLocalExecutionStatus(LOCAL_EXECUTION_DISABLED);
-				}
-			}
 
 			DeleteShardPlacementRow(shardPlacementId);
 		}
 
-		/*
-		 * Now that we deleted all placements of the shard (or their metadata),
-		 * delete the shard metadata as well.
-		 */
 		DeleteShardRow(shardId);
 	}
 
@@ -457,62 +381,6 @@ DropTaskList(Oid relationId, char *schemaName, char *relationName,
 	}
 
 	return taskList;
-}
-
-
-/*
- * ExecuteDropShardPlacementCommandRemotely executes the given DROP shard command
- * via remote critical connection.
- */
-static void
-ExecuteDropShardPlacementCommandRemotely(ShardPlacement *shardPlacement,
-										 const char *relationName,
-										 const char *dropShardPlacementCommand)
-{
-	Assert(shardPlacement != NULL);
-	Assert(relationName != NULL);
-	Assert(dropShardPlacementCommand != NULL);
-
-	uint32 connectionFlags = FOR_DDL;
-	MultiConnection *connection = GetPlacementConnection(connectionFlags,
-														 shardPlacement,
-														 NULL);
-
-	/*
-	 * This code-path doesn't support optional connections, so we don't expect
-	 * NULL connections.
-	 */
-	Assert(connection != NULL);
-
-	RemoteTransactionBeginIfNecessary(connection);
-
-	if (PQstatus(connection->pgConn) != CONNECTION_OK)
-	{
-		uint64 placementId = shardPlacement->placementId;
-
-		char *workerName = shardPlacement->nodeName;
-		uint32 workerPort = shardPlacement->nodePort;
-
-		/* build shard relation name */
-		uint64 shardId = shardPlacement->shardId;
-		char *shardRelationName = pstrdup(relationName);
-
-		AppendShardIdToName(&shardRelationName, shardId);
-
-		ereport(WARNING, (errmsg("could not connect to shard \"%s\" on node "
-								 "\"%s:%u\"", shardRelationName, workerName,
-								 workerPort),
-						  errdetail("Marking this shard placement for "
-									"deletion")));
-
-		UpdateShardPlacementState(placementId, SHARD_STATE_TO_DELETE);
-
-		return;
-	}
-
-	MarkRemoteTransactionCritical(connection);
-
-	ExecuteCriticalRemoteCommand(connection, dropShardPlacementCommand);
 }
 
 
