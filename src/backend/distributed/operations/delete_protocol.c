@@ -297,7 +297,7 @@ CheckTableSchemaNameForDrop(Oid relationId, char **schemaName, char **tableName)
  * We mark shard placements that we couldn't drop as to be deleted later, but
  * we do delete the shard metadadata.
  */
-#include "distributed/multi_executor.h"
+#include "distributed/adaptive_executor.h"
 static int
 DropShards(Oid relationId, char *schemaName, char *relationName,
 		   List *deletableShardIntervalList)
@@ -309,7 +309,7 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 	List *dropTaskList = DropTaskList(relationId, schemaName, relationName,
 									  deletableShardIntervalList);
 
-	ExecuteTaskListIntoTupleDest(ROW_MODIFY_NONCOMMUTATIVE, dropTaskList, CreateTupleDestNone(), false);
+	ExecuteUtilityTaskList(dropTaskList, true);
 
 	Task *task = NULL;
 	foreach_ptr(task, dropTaskList)
