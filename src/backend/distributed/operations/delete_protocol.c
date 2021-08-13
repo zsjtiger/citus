@@ -314,6 +314,7 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 	int32 localGroupId = GetLocalGroupId();
 
 	Task *task = NULL;
+	List *dropTaskList2 = NIL;
 	foreach_ptr(task, dropTaskList)
 	{
 		ShardPlacement *shardPlacement = NULL;
@@ -323,17 +324,26 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 			int32 shardPlacementGroupId = shardPlacement->groupId;
 
 			bool isLocalShardPlacement = (shardPlacementGroupId == localGroupId);
-
 			if (isLocalShardPlacement && DropSchemaOrDBInProgress() &&
 				localGroupId == COORDINATOR_GROUP_ID)
 			{
-				elog(INFO, "skip drop");
 				continue;
 			}
-
+			else if (shardPlacement->shardState != SHARD_STATE_ACTIVE)
+			{
+				continue;
+			}
 			newPlacementList = lappend(newPlacementList, shardPlacement);
 		}
+
+		if (list_length(newPlacementList) == 0)
+		{
+			/* no active placements to drop */
+			continue;
+		}
+
 		task->taskPlacementList = newPlacementList;
+		dropTaskList2 = lappend(dropTaskList2, task);
 	}
 
 	{
@@ -365,7 +375,8 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 		}
 	}
 
-	ExecuteUtilityTaskList(dropTaskList, true);
+
+	ExecuteUtilityTaskList(dropTaskList2, true);
 
 	task = NULL;
 	foreach_ptr(task, dropTaskList)
