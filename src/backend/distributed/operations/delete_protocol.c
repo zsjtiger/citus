@@ -308,8 +308,8 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 
 	List *dropTaskList = DropTaskList(relationId, schemaName, relationName,
 									  deletableShardIntervalList);
-
-	ExecuteUtilityTaskList(dropTaskList, true);
+	List *dropTaskList2 = NIL;
+	int32 localGroupId = GetLocalGroupId();
 
 	Task *task = NULL;
 	foreach_ptr(task, dropTaskList)
@@ -320,12 +320,27 @@ DropShards(Oid relationId, char *schemaName, char *relationName,
 		foreach_ptr(shardPlacement, task->taskPlacementList)
 		{
 			uint64 shardPlacementId = shardPlacement->placementId;
+			int32 shardPlacementGroupId = shardPlacement->groupId;
+
+			bool isLocalShardPlacement = (shardPlacementGroupId == localGroupId);
+
 
 			DeleteShardPlacementRow(shardPlacementId);
+
+
+			if (isLocalShardPlacement && DropSchemaOrDBInProgress() &&
+				localGroupId == COORDINATOR_GROUP_ID)
+			{
+				continue;
+			}
+			dropTaskList2 = lappend(dropTaskList2, task);
 		}
 
 		DeleteShardRow(shardId);
 	}
+
+	ExecuteUtilityTaskList(dropTaskList2, true);
+
 
 	int droppedShardCount = list_length(deletableShardIntervalList);
 
