@@ -493,24 +493,14 @@ SELECT * FROM multi_extension.print_extension_changes();
 ALTER EXTENSION citus UPDATE TO '9.5-1';
 BEGIN;
   SELECT master_add_node('localhost', :master_port, groupId=>0);
- master_add_node
----------------------------------------------------------------------
-               1
-(1 row)
-
+ERROR:  You can not use this yet
   CREATE TABLE citus_local_table (a int);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   SELECT create_citus_local_table('citus_local_table');
-NOTICE:  create_citus_local_table is deprecated in favour of citus_add_local_table_to_metadata
- create_citus_local_table
----------------------------------------------------------------------
-
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   -- downgrade from 9.5-1 to 9.4-1 should fail as we have a citus local table
   ALTER EXTENSION citus UPDATE TO '9.4-1';
-ERROR:  citus local tables are introduced in Citus 9.5
-HINT:  To downgrade Citus to an older version, you should first convert each citus local table to a postgres table by executing SELECT undistribute_table("%s")
-CONTEXT:  PL/pgSQL function inline_code_block line XX at RAISE
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- now we can downgrade as there is no citus local table
 ALTER EXTENSION citus UPDATE TO '9.4-1';
@@ -793,19 +783,23 @@ SELECT * FROM multi_extension.print_extension_changes();
 -- Snapshot of state at 10.2-1
 ALTER EXTENSION citus UPDATE TO '10.2-1';
 SELECT * FROM multi_extension.print_extension_changes();
-                    previous_object                     |                                      current_object
+                           previous_object                            |                                      current_object
 ---------------------------------------------------------------------
- function stop_metadata_sync_to_node(text,integer) void |
-                                                        | function citus_internal.downgrade_columnar_storage(regclass) void
-                                                        | function citus_internal.upgrade_columnar_storage(regclass) void
-                                                        | function citus_internal_add_partition_metadata(regclass,"char",text,integer,"char") void
-                                                        | function citus_internal_add_placement_metadata(bigint,integer,bigint,integer,bigint) void
-                                                        | function citus_internal_add_shard_metadata(regclass,bigint,"char",text,text) void
-                                                        | function citus_internal_delete_shard_metadata(bigint) void
-                                                        | function citus_internal_update_placement_metadata(bigint,integer,integer) void
-                                                        | function citus_internal_update_relation_colocation(oid,integer) void
-                                                        | function stop_metadata_sync_to_node(text,integer,boolean) void
-(10 rows)
+ function citus_add_node(text,integer,integer,noderole,name) integer  |
+ function master_add_node(text,integer,integer,noderole,name) integer |
+ function stop_metadata_sync_to_node(text,integer) void               |
+                                                                      | function citus_add_node(text,integer,integer,noderole,name,boolean) integer
+                                                                      | function citus_internal.downgrade_columnar_storage(regclass) void
+                                                                      | function citus_internal.upgrade_columnar_storage(regclass) void
+                                                                      | function citus_internal_add_partition_metadata(regclass,"char",text,integer,"char") void
+                                                                      | function citus_internal_add_placement_metadata(bigint,integer,bigint,integer,bigint) void
+                                                                      | function citus_internal_add_shard_metadata(regclass,bigint,"char",text,text) void
+                                                                      | function citus_internal_delete_shard_metadata(bigint) void
+                                                                      | function citus_internal_update_placement_metadata(bigint,integer,integer) void
+                                                                      | function citus_internal_update_relation_colocation(oid,integer) void
+                                                                      | function master_add_node(text,integer,integer,noderole,name,boolean) integer
+                                                                      | function stop_metadata_sync_to_node(text,integer,boolean) void
+(14 rows)
 
 DROP TABLE multi_extension.prev_objects, multi_extension.extension_diff;
 -- show running version
