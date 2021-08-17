@@ -271,6 +271,13 @@ citus_add_node(PG_FUNCTION_ARGS)
 		ActivateNode(nodeNameString, nodePort);
 	}
 
+	bool metadataSynced = PG_GETARG_BOOL(5);
+	if (metadataSynced)
+	{
+		ereport(ERROR, (errmsg("You can not use this yet")));
+		StartMetadataSyncToNode(nodeNameString, nodePort);
+	}
+
 	PG_RETURN_INT32(nodeId);
 }
 

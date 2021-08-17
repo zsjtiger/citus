@@ -20,3 +20,20 @@ DROP FUNCTION pg_catalog.citus_internal_update_relation_colocation(oid, integer)
 
 REVOKE ALL ON FUNCTION pg_catalog.worker_record_sequence_dependency(regclass,regclass,name) FROM PUBLIC;
 ALTER TABLE pg_catalog.pg_dist_placement DROP CONSTRAINT placement_shardid_groupid_unique_index;
+
+DROP FUNCTION pg_catalog.citus_add_node(text,int,int,noderole,name,boolean);
+#include "../udfs/citus_add_node/10.0-1.sql";
+
+DROP FUNCTION pg_catalog.master_add_node(text,int,int,noderole,name,boolean);
+CREATE FUNCTION master_add_node(nodename text,
+                                nodeport integer,
+                                groupid integer default -1,
+                                noderole noderole default 'primary',
+                                nodecluster name default 'default')
+  RETURNS INTEGER
+  LANGUAGE C STRICT
+  AS 'MODULE_PATHNAME', $$master_add_node$$;
+COMMENT ON FUNCTION master_add_node(nodename text, nodeport integer,
+                                    groupid integer, noderole noderole, nodecluster name)
+  IS 'add node to the cluster';
+REVOKE ALL ON FUNCTION master_add_node(text,int,int,noderole,name) FROM PUBLIC;
