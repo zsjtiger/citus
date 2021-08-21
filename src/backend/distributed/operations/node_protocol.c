@@ -863,28 +863,7 @@ GatherIndexAndConstraintDefinitionList(Form_pg_index indexForm, List **indexDDLE
 bool
 IndexImpliedByAConstraint(Form_pg_index indexForm)
 {
-	Assert(indexForm != NULL);
-
-	bool indexImpliedByConstraint = false;
-
-	/*
-	 * A primary key index is always created by a constraint statement.
-	 * A unique key index or exclusion index is created by a constraint
-	 * if and only if the index has a corresponding constraint entry in
-	 * pg_depend. Any other index form is never associated with a constraint.
-	 */
-	if (indexForm->indisprimary)
-	{
-		indexImpliedByConstraint = true;
-	}
-	else if (indexForm->indisunique || indexForm->indisexclusion)
-	{
-		Oid constraintId = get_index_constraint(indexForm->indexrelid);
-
-		indexImpliedByConstraint = OidIsValid(constraintId);
-	}
-
-	return indexImpliedByConstraint;
+	return OidIsValid(get_index_constraint(indexForm->oid));
 }
 
 
