@@ -863,7 +863,7 @@ GatherIndexAndConstraintDefinitionList(Form_pg_index indexForm, List **indexDDLE
 bool
 IndexImpliedByAConstraint(Form_pg_index indexForm)
 {
-	return OidIsValid(get_index_constraint(indexForm->oid));
+	return OidIsValid(get_index_constraint(indexForm->indexrelid));
 }
 
 
