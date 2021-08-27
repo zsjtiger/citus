@@ -1228,6 +1228,20 @@ RoleSpecString(RoleSpec *spec, bool withQuoteIdentifier)
 				   GetUserNameFromId(GetSessionUserId(), false);
 		}
 
+		#if PG_VERSION_NUM >= PG_VERSION_14
+		case ROLESPEC_CURRENT_ROLE:
+		{
+			Oid currentRoleOid = GetCurrentRoleId();
+			if (currentRoleOid == InvalidOid)
+			{
+				elog(ERROR, "CURRENT_ROLE not set yet.");
+			}
+			return withQuoteIdentifier ?
+				   quote_identifier(GetUserNameFromId(currentRoleOid, false)) :
+				   GetUserNameFromId(currentRoleOid, false);
+		}
+		#endif
+
 		case ROLESPEC_PUBLIC:
 		{
 			return "PUBLIC";
