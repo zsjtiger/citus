@@ -10,7 +10,7 @@ SET search_path TO "pg14test";
 SET citus.next_shard_id TO 980000;
 SET citus.shard_count TO 2;
 -- test the new vacuum option, process_toast
-CREATE TABLE t1 (a int);
+CREATE TABLE t1 (a int, b int);
 SELECT create_distributed_table('t1','a');
  create_distributed_table
 ---------------------------------------------------------------------
@@ -66,4 +66,10 @@ ALTER TABLE par DETACH PARTITION par_2 CONCURRENTLY;
 ERROR:  ALTER TABLE .. DETACH PARTITION .. CONCURRENTLY commands are currently unsupported.
 ALTER TABLE par DETACH PARTITION par_2 FINALIZE;
 ERROR:  ALTER TABLE .. DETACH PARTITION .. FINALIZE commands are currently unsupported.
+-- CREATE STATISTICS only allow simple column references
+-- the last one should error out
+CREATE STATISTICS s1 (dependencies) ON a, b FROM t1;
+CREATE STATISTICS s2 (mcv) ON a, b FROM t1;
+CREATE STATISTICS s3 (ndistinct) ON date_trunc('month', a), date_trunc('day', a) FROM t1;
+ERROR:  only simple column references are allowed in CREATE STATISTICS
 DROP SCHEMA pg14test CASCADE;

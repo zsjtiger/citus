@@ -11,7 +11,7 @@ SET citus.next_shard_id TO 980000;
 SET citus.shard_count TO 2;
 
 -- test the new vacuum option, process_toast
-CREATE TABLE t1 (a int);
+CREATE TABLE t1 (a int, b int);
 SELECT create_distributed_table('t1','a');
 SET citus.log_remote_commands TO ON;
 VACUUM (FULL) t1;
@@ -30,5 +30,11 @@ ALTER TABLE par DETACH PARTITION par_1 CONCURRENTLY;
 SELECT create_distributed_table('par','a');
 ALTER TABLE par DETACH PARTITION par_2 CONCURRENTLY;
 ALTER TABLE par DETACH PARTITION par_2 FINALIZE;
+
+-- CREATE STATISTICS only allow simple column references
+-- the last one should error out
+CREATE STATISTICS s1 (dependencies) ON a, b FROM t1;
+CREATE STATISTICS s2 (mcv) ON a, b FROM t1;
+CREATE STATISTICS s3 (ndistinct) ON date_trunc('month', a), date_trunc('day', a) FROM t1;
 
 DROP SCHEMA pg14test CASCADE;

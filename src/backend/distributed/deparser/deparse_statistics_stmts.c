@@ -242,6 +242,14 @@ AppendColumnNames(StringInfo buf, CreateStatsStmt *stmt)
 
 	foreach_ptr(column, stmt->exprs)
 	{
+		if (!column->name)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg(
+						 "only simple column references are allowed in CREATE STATISTICS")));
+		}
+
 		char *columnName = NameListToQuotedString(list_make1(makeString(column->name)));
 
 		appendStringInfoString(buf, columnName);
