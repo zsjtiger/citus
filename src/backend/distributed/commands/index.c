@@ -40,6 +40,7 @@
 #include "distributed/worker_manager.h"
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
+#include "nodes/makefuncs.h"
 #include "nodes/parsenodes.h"
 #include "storage/lmgr.h"
 #include "utils/builtins.h"
@@ -217,6 +218,29 @@ PreprocessIndexStmt(Node *node, const char *createIndexCommand,
 	 * indexes are inserted into postgres' metadata tables, like pg_class.
 	 */
 	SwitchToSequentialAndLocalExecutionIfIndexNameTooLong(createIndexStatement);
+
+	/* if this table is partitioned table, and we're not using ONLY, create indexes on partitions */
+	if (PartitionedTable(relationId) && createIndexStatement->relation->inh)
+	{
+		List *partitionList = PartitionList(relationId);
+		Oid partitionRelationId = InvalidOid;
+		foreach_oid(partitionRelationId, partitionList)
+		{
+			/* TODO: add some more checks here, like the checks in internal command of postgres */
+			/* among other things, */
+			/* these checks will decide if we need to create an index on partition or not */
+			IndexStmt *indexStmtCopy = copyObject(createIndexStatement);
+			indexStmtCopy->idxname = NULL;
+			char *partitionNamespace = get_namespace_name(get_rel_namespace(
+															  partitionRelationId));
+			char *partitionName = get_rel_name(partitionRelationId);
+			indexStmtCopy->relation = makeRangeVar(partitionNamespace, partitionName, -1);
+			indexStmtCopy->relation->inh = false;
+
+			ProcessUtilityParseTree((Node *) indexStmtCopy, createIndexCommand,
+									PROCESS_UTILITY_QUERY, NULL, None_Receiver, NULL);
+		}
+	}
 
 	DDLJob *ddlJob = GenerateCreateIndexDDLJob(createIndexStatement, createIndexCommand);
 	return list_make1(ddlJob);
