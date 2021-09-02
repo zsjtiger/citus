@@ -45,7 +45,6 @@ typedef struct ColumnarScanState
 	CustomScanState custom_scanstate; /* must be first field */
 
 	List *qual;
-	Index scanrelid;
 } ColumnarScanState;
 
 
@@ -668,9 +667,6 @@ ColumnarScan_CreateCustomScanState(CustomScan *cscan)
 		columnarScanState->qual = cscan->scan.plan.qual;
 	}
 
-	/* used by ColumnarVarNeeded for EXPLAIN when building Var's from scratch */
-	columnarScanState->scanrelid = cscan->scan.scanrelid;
-
 	return (Node *) cscanstate;
 }
 
@@ -903,23 +899,19 @@ ColumnarVarNeeded(ColumnarScanState *columnarScanState)
 	int bmsMember = -1;
 	while ((bmsMember = bms_next_member(neededAttrSet, bmsMember)) >= 0)
 	{
-		/* neededAttrSet represents 0-indexed attribute numbers */
-		AttrNumber attrNumber = bmsMember + 1;
-
 		Relation columnarRelation = scanState->ss_currentRelation;
-		HeapTuple columnTuple =
-			SearchSysCacheAttNum(RelationGetRelid(columnarRelation), attrNumber);
-		if (!HeapTupleIsValid(columnTuple))
+
+		/* neededAttrSet already represents 0-indexed attribute numbers */
+		Form_pg_attribute columnForm =
+			TupleDescAttr(RelationGetDescr(columnarRelation), bmsMember);
+		if (columnForm->attisdropped)
 		{
 			ereport(ERROR, (errcode(ERRCODE_UNDEFINED_COLUMN),
 							errmsg("cannot explain column with attrNum=%d "
-								   "of columnar table %s since it does not "
-								   "exist", attrNumber,
-								   RelationGetRelationName(columnarRelation))));
+								   "of columnar table %s since it is dropped",
+								   bmsMember+1, RelationGetRelationName(columnarRelation))));
 		}
-
-		Form_pg_attribute columnForm = (Form_pg_attribute) GETSTRUCT(columnTuple);
-		if (columnForm->attnum <= 0)
+		else if (columnForm->attnum <= 0)
 		{
 			/*
 			 * ColumnarAttrNeeded should have already thrown an error for
@@ -930,7 +922,7 @@ ColumnarVarNeeded(ColumnarScanState *columnarScanState)
 							errmsg("cannot explain column with attrNum=%d "
 								   "of columnar table %s since it is either "
 								   "a system column or a whole-row "
-								   "reference", attrNumber,
+								   "reference", columnForm->attnum,
 								   RelationGetRelationName(columnarRelation))));
 		}
 
@@ -941,12 +933,13 @@ ColumnarVarNeeded(ColumnarScanState *columnarScanState)
 		 * relation, it is useless here.
 		 */
 		Index varlevelsup = 0;
-		Var *var = makeVar(columnarScanState->scanrelid, columnForm->attnum,
-						   columnForm->atttypid, columnForm->atttypmod,
-						   columnForm->attcollation, varlevelsup);
 
-		ReleaseSysCache(columnTuple);
-
+		CustomScanState * customScanState = (CustomScanState *) columnarScanState;
+		CustomScan *customScan = (CustomScan *) customScanState->ss.ps.plan;
+		Index scanrelid = customScan->scan.scanrelid;
+		Var *var = makeVar(scanrelid, columnForm->attnum, columnForm->atttypid,
+						   columnForm->atttypmod, columnForm->attcollation,
+						   varlevelsup);
 		varList = lappend(varList, var);
 	}
 
