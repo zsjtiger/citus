@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION pg_catalog.get_missing_partition_ranges(
     table_name regclass,
     to_date timestamptz,
-    start_from timestamptz DEFAULT NULL)
+    start_from timestamptz DEFAULT NULL,
+    partition_interval interval DEFAULT NULL)
 returns table(
     partition_name text,
     range_from_value text,
@@ -21,20 +22,26 @@ DECLARE
     datetime_string_format text;
     max_table_name_length int;
 BEGIN
-    /*
-     * First check whether such timeseries table exists. If not, error out.
-     *
-     * Then check if start_from is given. If it is, create the range using that time
-     * and let remaining of the function fill the gap till to_date.
-     */
-
-    SELECT partitioninterval
+    SELECT to_value::timestamptz - from_value::timestamptz
     INTO table_partition_interval
-    FROM timeseries.tables
-    WHERE logicalrelid = table_name;
+    FROM pg_catalog.time_partitions
+    WHERE parent_table = table_name
+    ORDER BY from_value::timestamptz ASC
+    LIMIT 1;
 
-    IF NOT found THEN
-        RAISE '% must be timeseries table', table_name;
+    IF NOT FOUND THEN
+        /* first partition, use the parameter */
+        table_partition_interval := partition_interval;
+
+        IF partition_interval IS NULL THEN
+            RAISE 'must specify a partition_interval when there are no partitions yet';
+        ELSIF start_from IS NULL THEN
+            start_from := now() - 7 * partition_interval;
+        END IF;
+    ELSE
+        IF partition_interval IS NOT NULL AND partition_interval <> table_partition_interval THEN
+            RAISE 'partition_interval does not match existing partitions';
+        END IF;
     END IF;
 
     IF start_from IS NOT NULL THEN
@@ -219,7 +226,8 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION pg_catalog.create_missing_partitions(
-	table_name regclass,
+    table_name regclass,
     to_date timestamptz,
-    start_from timestamptz)
+    start_from timestamptz,
+    partition_interval interval)
 IS 'create missing partitions for the given timeseries table';

@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION pg_catalog.create_missing_partitions(
     table_name regclass,
     to_date timestamptz,
-    start_from timestamptz DEFAULT NULL)
+    start_from timestamptz DEFAULT NULL,
+    partition_interval interval DEFAULT NULL)
 returns boolean
 LANGUAGE plpgsql
 AS $$
@@ -20,7 +21,7 @@ BEGIN
 
     FOR missing_partition_record IN
         SELECT *
-        FROM get_missing_partition_ranges(table_name, to_date, start_from)
+        FROM get_missing_partition_ranges(table_name, to_date, start_from, partition_interval)
     LOOP
         EXECUTE format('CREATE TABLE %s PARTITION OF %s FOR VALUES FROM (''%s'') TO (''%s'')', missing_partition_record.partition_name, table_name::text, missing_partition_record.range_from_value, missing_partition_record.range_to_value);
     END LOOP;
@@ -31,5 +32,6 @@ $$;
 COMMENT ON FUNCTION pg_catalog.create_missing_partitions(
     table_name regclass,
     to_date timestamptz,
-    start_from timestamptz)
+    start_from timestamptz,
+    partition_interval interval)
 IS 'create missing partitions for the given timeseries table and range';
