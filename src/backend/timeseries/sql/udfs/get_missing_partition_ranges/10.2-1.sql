@@ -126,29 +126,35 @@ BEGIN
     FROM pg_settings
     WHERE name = 'max_identifier_length';
 
-    -- Follow the same naming schema with pg_partman
-    -- to allow easy migration
-    datetime_string_format := 'YYYY';
-    IF table_partition_interval < '1 year' THEN
-        IF table_partition_interval = INTERVAL '3 months' THEN
-            datetime_string_format = 'YYYY"q"Q';
-        ELSE
+    /* reuse pg_partman naming scheme for back-and-forth migration */
+    IF table_partition_interval = INTERVAL '3 months' THEN
+        /* include quarter in partition name */
+        datetime_string_format = 'YYYY"q"Q';
+    ELSIF table_partition_interval = INTERVAL '1 week' THEN
+        /* include week number in partition name */
+        datetime_string_format := 'IYYY"w"IW';
+    ELSE
+        /* in all other cases, start with the year */
+        datetime_string_format := 'YYYY';
+
+        IF table_partition_interval < INTERVAL '1 year'
+            /* include month in partition name */
             datetime_string_format := datetime_string_format || '_MM';
         END IF;
 
-        IF table_partition_interval < '1 month' THEN
-            IF table_partition_interval = INTERVAL '1 week' THEN
-                datetime_string_format := 'IYYY"w"IW';
-            ELSE
-                datetime_string_format := datetime_string_format || '_DD';
-            END IF;
+        IF table_partition_interval < INTERVAL '1 month' THEN
+            /* include day of month in partition name */
+            datetime_string_format := datetime_string_format || '_DD';
+        END IF;
 
-            IF table_partition_interval < '1 day' THEN
-                datetime_string_format := datetime_string_format || '_HH24MI';
-                IF table_partition_interval < '1 minute' THEN
-                    datetime_string_format := datetime_string_format || 'SS';
-                END IF;
-            END IF;
+        IF table_partition_interval < INTERVAL '1 day' THEN
+            /* include time of day in partition name */
+            datetime_string_format := datetime_string_format || '_HH24MI';
+        END IF;
+
+        IF table_partition_interval < INTERVAL '1 minute' THEN
+             /* include seconds in time of day in partition name */
+             datetime_string_format := datetime_string_format || 'SS';
         END IF;
     END IF;
 
