@@ -1325,6 +1325,7 @@ CREATE TABLE non_distributed_child_3 (event_id int NOT NULL, event_time timestam
 ALTER TABLE distributed_parent_table ATTACH PARTITION non_distributed_child_3 FOR VALUES FROM ('2021-07-30') TO ('2021-08-01');
 
 -- Test time partition utility UDFs
+-- a) test get_missing_time_partition_ranges
 -- 1) test get_missing_time_partition_ranges with date partitioned table
 CREATE TABLE date_partitioned_table(
  measureid integer,
@@ -1411,7 +1412,7 @@ BEGIN;
   CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
   CREATE TABLE tstz_partitioned_table_2020_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-03 00:00:00');
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-  SELECSELECT * FROMT get_missing_time_partition_ranges('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
+  SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
 ROLLBACK;
 
 BEGIN;
@@ -1434,7 +1435,7 @@ ROLLBACK;
 
 DROP TABLE tstz_partitioned_table;
 
--- 2) test timestamp without time zone partitioend table
+-- 3) test timestamp without time zone partitioend table
 CREATE TABLE tswtz_partitioned_table(
  measureid integer,
  eventdatetime timestamp without time zone,
@@ -1487,7 +1488,7 @@ ROLLBACK;
 
 DROP TABLE tswtz_partitioned_table;
 
--- 2) test with weird name
+-- 4) test with weird name
 CREATE TABLE "test !/ \n _dist_123_table"(
  measureid integer,
  eventdatetime timestamp without time zone,
@@ -1502,6 +1503,289 @@ SELECT * FROM get_missing_time_partition_ranges('"test !/ \n _dist_123_table"', 
 SELECT * FROM get_missing_time_partition_ranges('"test !/ \n _dist_123_table"', '2021-01-03 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 day');
 
 DROP TABLE "test !/ \n _dist_123_table";
+
+-- b) test create_time_partitions
+-- 1) test create_time_partitions with date partitioned table
+CREATE TABLE date_partitioned_table(
+ measureid integer,
+ eventdate date,
+ measure_data jsonb) PARTITION BY RANGE(eventdate);
+
+-- test interval must be multiple days for date partitioned table
+SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '6 hours');
+SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '1 week 1 day 1 hour');
+
+-- test with various intervals
+BEGIN;
+  SELECT create_time_partitions('date_partitioned_table', '2021-02-01', '2021-01-01', INTERVAL '1 day');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '1 week');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '1 month');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '3 months');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('date_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '6 months');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+-- test with from_date > to_date
+SELECT * FROM create_time_partitions('date_partitioned_table', '2021-01-01', '2021-02-01', INTERVAL '1 day');
+
+-- test with existing partitions
+BEGIN;
+  CREATE TABLE date_partitioned_table_2020_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-05', '2020-12-30');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-15', '2020-12-25', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE date_partitioned_table_2020_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
+  CREATE TABLE date_partitioned_table_2020_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-02') TO ('2021-01-03');
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-05', '2020-12-30');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-05', '2020-12-30', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE date_partitioned_table_2020_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-03');
+  CREATE TABLE date_partitioned_table_2020_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-05') TO ('2021-01-07');
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-15', '2020-12-30');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE date_partitioned_table_2020_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
+  CREATE TABLE date_partitioned_table_2020_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-02') TO ('2021-01-04');
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-05', '2020-12-30');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE date_partitioned_table_2020_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-03');
+  CREATE TABLE date_partitioned_table_2020_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-04') TO ('2021-01-06');
+  SELECT create_time_partitions('date_partitioned_table', '2021-01-15', '2020-12-30');
+ROLLBACK;
+
+DROP TABLE date_partitioned_table;
+
+-- 2) test timestamp with time zone partitioend table
+CREATE TABLE tstz_partitioned_table(
+ measureid integer,
+ eventdatetime timestamp with time zone,
+ measure_data jsonb) PARTITION BY RANGE(eventdatetime);
+
+-- test with various intervals
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-01 12:00:00', '2021-01-01 00:00:00', INTERVAL '30 minutes');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 hour');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '6 hours');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '12 hours');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-05 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 day');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-15 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 week');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+-- test with from_date > to_date
+SELECT create_time_partitions('tstz_partitioned_table', '2021-01-01 00:00:00', '2021-01-05 00:00:00', INTERVAL '1 day');
+
+-- test with existing partitions
+BEGIN;
+  CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  CREATE TABLE tstz_partitioned_table_2020_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-03 00:00:00');
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
+  CREATE TABLE tstz_partitioned_table_2020_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-05 00:00:00') TO ('2021-01-07 00:00:00');
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tstz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  CREATE TABLE tstz_partitioned_table_2020_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tstz_partitioned_table_2020_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
+  CREATE TABLE tstz_partitioned_table_2020_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
+  SELECT create_time_partitions('tstz_partitioned_table', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
+ROLLBACK;
+
+DROP TABLE tstz_partitioned_table;
+
+-- 3) test timestamp without time zone partitioend table
+CREATE TABLE tswtz_partitioned_table(
+ measureid integer,
+ eventdatetime timestamp without time zone,
+ measure_data jsonb) PARTITION BY RANGE(eventdatetime);
+
+SELECT create_distributed_table('tswtz_partitioned_table','measureid');
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-01 12:00:00', '2021-01-01 00:00:00', INTERVAL '30 minutes');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 hour');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '6 hours');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '12 hours');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-05 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 day');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-15 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 week');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+-- test with from_date > to_date
+SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-01 00:00:00', '2021-01-05 00:00:00', INTERVAL '1 day');
+
+-- test with existing partitions
+BEGIN;
+  CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT create_time_partitions('tstz_partitiotswtz_partitioned_tablened_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-03 00:00:00');
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00', INTERVAL '2 days');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
+  CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-05 00:00:00') TO ('2021-01-07 00:00:00');
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
+  SELECT * FROM time_partitions WHERE parent_table = 'tswtz_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
+  CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
+ROLLBACK;
+
+BEGIN;
+  CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
+  CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
+  SELECT create_time_partitions('tswtz_partitioned_table', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
+ROLLBACK;
+
+DROP TABLE tswtz_partitioned_table;
+
+-- 4) test with weird name
+CREATE TABLE "test !/ \n _dist_123_table"(
+ measureid integer,
+ eventdatetime timestamp without time zone,
+ measure_data jsonb) PARTITION BY RANGE(eventdatetime);
+
+SELECT create_distributed_table('"test !/ \n _dist_123_table"','measureid');
+
+-- test with various intervals
+BEGIN;
+  SELECT create_time_partitions('"test !/ \n _dist_123_table"', '2021-01-01 12:00:00', '2021-01-01 00:00:00', INTERVAL '30 minutes');
+  SELECT * FROM time_partitions WHERE parent_table = '"test !/ \n _dist_123_table"'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('"test !/ \n _dist_123_table"', '2021-01-02 00:00:00', '2021-01-01 00:00:00', INTERVAL '6 hours');
+  SELECT * FROM time_partitions WHERE parent_table = '"test !/ \n _dist_123_table"'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('"test !/ \n _dist_123_table"', '2021-01-03 00:00:00', '2021-01-01 00:00:00', INTERVAL '1 day');
+  SELECT * FROM time_partitions WHERE parent_table = '"test !/ \n _dist_123_table"'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+DROP TABLE "test !/ \n _dist_123_table";
+
+-- 5) test with distributed table
+CREATE TABLE date_distributed_partitioned_table(
+ measureid integer,
+ eventdate date,
+ measure_data jsonb) PARTITION BY RANGE(eventdate);
+
+SELECT create_distributed_table('date_distributed_partitioned_table', 'measureid');
+
+-- test interval must be multiple days for date partitioned table
+SELECT create_time_partitions('date_distributed_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '6 hours');
+SELECT create_time_partitions('date_distributed_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '1 week 1 day 1 hour');
+
+-- test with various intervals
+BEGIN;
+  SELECT create_time_partitions('date_distributed_partitioned_table', '2021-02-01', '2021-01-01', INTERVAL '1 day');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_distributed_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+BEGIN;
+  SELECT create_time_partitions('date_distributed_partitioned_table', '2022-01-01', '2021-01-01', INTERVAL '1 week');
+  SELECT * FROM time_partitions WHERE parent_table = 'date_distributed_partitioned_table'::regclass ORDER BY 4,5;
+ROLLBACK;
+
+DROP TABLE date_distributed_partitioned_table;
 
 DROP SCHEMA partitioning_schema CASCADE;
 RESET search_path;

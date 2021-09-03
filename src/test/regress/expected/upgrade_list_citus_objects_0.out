@@ -106,6 +106,7 @@ ORDER BY 1;
  function create_distributed_table(regclass,text,citus.distribution_type,text,integer)
  function create_intermediate_result(text,text)
  function create_reference_table(regclass)
+ function create_time_partitions(regclass,timestamp with time zone,timestamp with time zone,interval)
  function distributed_tables_colocated(regclass,regclass)
  function dump_global_wait_edges()
  function dump_local_wait_edges()
@@ -241,5 +242,5 @@ ORDER BY 1;
  view citus_worker_stat_activity
  view pg_dist_shard_placement
  view time_partitions
-(225 rows)
+(226 rows)
 
