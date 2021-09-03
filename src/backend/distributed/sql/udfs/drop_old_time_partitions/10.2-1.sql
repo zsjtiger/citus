@@ -1,6 +1,5 @@
--- heavily inspired by the procedure alter_old_partitions_set_access_method
 CREATE OR REPLACE PROCEDURE pg_catalog.drop_old_time_partitions(
-	parent_table_name regclass,
+	table_name regclass,
 	older_than timestamptz)
 LANGUAGE plpgsql
 AS $$
@@ -16,10 +15,10 @@ BEGIN
     SELECT partnatts, partattrs[0]
     INTO number_of_partition_columns, partition_column_index
     FROM pg_catalog.pg_partitioned_table
-    WHERE partrelid = parent_table_name;
+    WHERE partrelid = table_name;
 
     IF NOT FOUND THEN
-        RAISE '% is not partitioned', parent_table_name::text;
+        RAISE '% is not partitioned', table_name::text;
     ELSIF number_of_partition_columns <> 1 THEN
         RAISE 'partitioned tables with multiple partition columns are not supported';
     END IF;
@@ -28,20 +27,20 @@ BEGIN
     SELECT atttypid
     INTO partition_column_type
     FROM pg_attribute
-    WHERE attrelid = parent_table_name::oid
+    WHERE attrelid = table_name::oid
     AND attnum = partition_column_index;
 
     -- we currently only support partitioning by date, timestamp, and timestamptz
     IF partition_column_type <> 'date'::regtype
     AND partition_column_type <> 'timestamp'::regtype
     AND partition_column_type <> 'timestamptz'::regtype  THEN
-        RAISE 'type of the partition column of the table % must be date, timestamp or timestamptz', parent_table_name;
+        RAISE 'type of the partition column of the table % must be date, timestamp or timestamptz', table_name;
     END IF;
 
     FOR r IN
 		SELECT partition, nspname AS schema_name, relname AS table_name, from_value, to_value
 		FROM pg_catalog.time_partitions, pg_catalog.pg_class c, pg_catalog.pg_namespace n
-		WHERE parent_table = parent_table_name AND partition = c.oid AND c.relnamespace = n.oid
+		WHERE parent_table = table_name AND partition = c.oid AND c.relnamespace = n.oid
 		AND to_value IS NOT NULL
 		AND to_value::timestamptz <= older_than
 		ORDER BY to_value::timestamptz
@@ -52,6 +51,6 @@ BEGIN
 END;
 $$;
 COMMENT ON PROCEDURE pg_catalog.drop_old_time_partitions(
-	parent_table_name regclass,
+	table_name regclass,
 	older_than timestamptz)
 IS 'drop old partitions of a time-partitioned table';
