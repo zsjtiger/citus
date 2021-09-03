@@ -10,10 +10,15 @@ returns table(
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    /* properties of the partitioned table */
+    table_name_text text;
+    number_of_partition_columns int;
+    partition_column_index int;
+    partition_column_type regtype;
+
     distinct_partition_interval_count int;
     table_partition_interval INTERVAL;
     is_multiple_days boolean;
-    table_partition_column_type_name text;
     manual_partition_from_value_text text;
     manual_partition_to_value_text text;
     current_range_from_value timestamptz := NULL;
@@ -21,16 +26,18 @@ DECLARE
     current_range_from_value_text text;
     current_range_to_value_text text;
     datetime_string_format text;
-    max_table_name_length int;
-    table_name_text text;
+    max_table_name_length int := current_setting('max_identifier_length');
 BEGIN
     /* check whether the table is time partitioned table, if not error out */
-    PERFORM *
-    FROM pg_catalog.pg_partitioned_table
-    WHERE partrelid = table_name::oid;
+    SELECT relname, partnatts, partattrs[0]
+    INTO table_name_text, number_of_partition_columns, partition_column_index
+    FROM pg_catalog.pg_partitioned_table, pg_catalog.pg_class c
+    WHERE partrelid = c.oid AND c.oid = table_name;
 
     IF NOT FOUND THEN
         RAISE '% is not partitioned', table_name;
+    ELSIF number_of_partition_columns <> 1 THEN
+        RAISE 'partitioned tables with multiple partition columns are not supported';
     END IF;
 
     BEGIN
@@ -42,13 +49,13 @@ BEGIN
 	END;
 
     /* get datatype here to check interval-table type alignment and generate range values in the right data format */
-    SELECT atttypid::regtype::text
-    INTO table_partition_column_type_name
+    SELECT atttypid
+    INTO partition_column_type
     FROM pg_attribute
     WHERE attrelid = table_name::oid
-    AND attnum = (select partattrs[0] from pg_partitioned_table where partrelid = table_name::oid);
+    AND attnum = partition_column_index;
 
-    IF table_partition_column_type_name = 'date' AND partition_interval IS NOT NULL THEN
+    IF partition_column_type = 'date'::regtype AND partition_interval IS NOT NULL THEN
         SELECT date_trunc('day', partition_interval) = partition_interval
         INTO is_multiple_days;
 
@@ -146,18 +153,6 @@ BEGIN
     ELSIF distinct_partition_interval_count > 1 THEN
         RAISE 'each partition must cover same interval to use that function'; --TODO: Check the message
     END IF;
-
-    /* get max_table_name_length to use it while finding partitions' name */
-    SELECT max_val
-    INTO max_table_name_length
-    FROM pg_settings
-    WHERE name = 'max_identifier_length';
-
-    /* get table_name from pg_class to generate name without schema */
-    SELECT relname
-    INTO table_name_text
-    FROM pg_class AS p JOIN pg_namespace AS n ON p.relnamespace = n.oid
-    WHERE p.oid = table_name::oid;
 
     /* reuse pg_partman naming scheme for back-and-forth migration */
     IF table_partition_interval = INTERVAL '3 months' THEN

@@ -19,22 +19,16 @@ BEGIN
 		RAISE 'partition column of % cannot be cast to a timestamptz', parent_table_name;
 	END;
 
-	SELECT nspname
-    INTO schema_name_text
-    FROM pg_class JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid 
-    WHERE pg_class.oid = parent_table_name::oid;
-
-	/* now drop the partitions in separate transactions */
     FOR r IN
-		SELECT partition, from_value, to_value
-		FROM pg_catalog.time_partitions
-		WHERE parent_table = parent_table_name
+		SELECT partition, nspname AS schema_name, relname AS table_name, from_value, to_value
+		FROM pg_catalog.time_partitions, pg_catalog.pg_class c, pg_catalog.pg_namespace n
+		WHERE parent_table = parent_table_name AND partition = c.oid AND c.relnamespace = n.oid
 		AND to_value IS NOT NULL
 		AND to_value::timestamptz <= older_than
 		ORDER BY to_value::timestamptz
     LOOP
         RAISE NOTICE 'dropping % with start time % and end time %', r.partition, r.from_value, r.to_value;
-        EXECUTE format('DROP TABLE %I.%I', schema_name_text, r.partition);
+        EXECUTE format('DROP TABLE %I.%I', r.schema_name, r.table_name);
     END LOOP;
 END;
 $$;
