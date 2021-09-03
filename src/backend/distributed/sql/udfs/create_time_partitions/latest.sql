@@ -7,9 +7,15 @@ returns boolean
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    /* partitioned table name */
+    schema_name_text name;
+    table_name_text name;
+
+    /* record for to-be-created parttion */
     missing_partition_record record;
-    schema_name_text text;
-    table_name_text text;
+
+    /* result indiciates whether any partitions were created */
+    partition_created bool := false;
 BEGIN
     SELECT nspname, relname
     INTO schema_name_text, table_name_text
@@ -24,16 +30,18 @@ BEGIN
         SELECT *
         FROM get_missing_time_partition_ranges(table_name, to_date, start_from, partition_interval)
     LOOP
-        EXECUTE format('CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (''%s'') TO (''%s'')',
+        EXECUTE format('CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
         schema_name_text,
         missing_partition_record.partition_name,
         schema_name_text,
         table_name_text,
         missing_partition_record.range_from_value,
         missing_partition_record.range_to_value);
+
+        partition_created := true;
     END LOOP;
 
-    RETURN true;
+    RETURN partition_created;
 END;
 $$;
 COMMENT ON FUNCTION pg_catalog.create_time_partitions(
