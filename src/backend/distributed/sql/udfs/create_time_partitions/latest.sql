@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION pg_catalog.create_time_partitions(
     table_name regclass,
     to_value timestamptz,
-    from_value timestamptz DEFAULT NULL,
+    from_value timestamptz DEFAULT now(),
     partition_interval INTERVAL DEFAULT NULL)
 returns boolean
 LANGUAGE plpgsql

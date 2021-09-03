@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION pg_catalog.get_missing_time_partition_ranges(
     table_name regclass,
-    to_date timestamptz,
-    start_from timestamptz DEFAULT now(),
+    to_value timestamptz,
+    from_value timestamptz DEFAULT now(),
     partition_interval INTERVAL DEFAULT NULL)
 returns table(
     partition_name text,
@@ -28,6 +28,10 @@ DECLARE
     datetime_string_format text;
     max_table_name_length int := current_setting('max_identifier_length');
 BEGIN
+
+    /* to not to have partitions to be created in parallel */
+    LOCK TABLE table_name IN SHARE UPDATE EXCLUSIVE;
+
     /* check whether the table is time partitioned table, if not error out */
     SELECT relname, partnatts, partattrs[0]
     INTO table_name_text, number_of_partition_columns, partition_column_index
@@ -60,7 +64,7 @@ BEGIN
         INTO is_multiple_days;
 
         IF NOT is_multiple_days THEN
-            RAISE 'partition interval of date partitioned column must be multiple days';
+            RAISE 'partition interval of date partitioned column must be day or multiple days';
         END IF;
     END IF;
 
@@ -78,8 +82,6 @@ BEGIN
      *
      * Note that, to_value and from_value is equal to '', if default partition exist.
      * To skip them, additional checks are added to the query.
-     *
-     * TODO: Should we lock parent table to not to create partition in parallel?
      */
     SELECT
     COUNT(DISTINCT to_value::timestamptz - from_value::timestamptz)
@@ -97,23 +99,23 @@ BEGIN
         /*
          * Decide on the current_range_from_value of the initial partition according to interval of the table.
          * Since we will create all other partitions by adding intervals, truncating given start time will provide
-         * more intuitive interval ranges, instead of starting from start_from directly.
+         * more intuitive interval ranges, instead of starting from from_value directly.
          * TODO: Check truncate for quarter
          */
         IF table_partition_interval < INTERVAL '1 hour' THEN
-            current_range_from_value = date_trunc('minute', start_from);
+            current_range_from_value = date_trunc('minute', from_value);
         ELSIF table_partition_interval < INTERVAL '1 day' THEN
-            current_range_from_value = date_trunc('hour', start_from);
+            current_range_from_value = date_trunc('hour', from_value);
         ELSIF table_partition_interval < INTERVAL '1 week' THEN
-            current_range_from_value = date_trunc('day', start_from);
+            current_range_from_value = date_trunc('day', from_value);
         ELSIF table_partition_interval < INTERVAL '1 month' THEN
-            current_range_from_value = date_trunc('week', start_from);
+            current_range_from_value = date_trunc('week', from_value);
         ELSIF table_partition_interval = INTERVAL '3 months' THEN
-            current_range_from_value = date_trunc('quarter', start_from);
+            current_range_from_value = date_trunc('quarter', from_value);
         ELSIF table_partition_interval < INTERVAL '1 year' THEN
-            current_range_from_value = date_trunc('month', start_from);
+            current_range_from_value = date_trunc('month', from_value);
         ELSE
-            current_range_from_value = date_trunc('year', start_from);
+            current_range_from_value = date_trunc('year', from_value);
         END IF;
 
         current_range_to_value := current_range_from_value + table_partition_interval;
@@ -137,14 +139,14 @@ BEGIN
         ORDER BY from_value::timestamptz ASC
         LIMIT 1;
 
-        /* if start_from is newer than pivot's from value, go forward, else go backward */
-        IF start_from >= current_range_from_value THEN
-            WHILE current_range_from_value < start_from LOOP
+        /* if from_value is newer than pivot's from value, go forward, else go backward */
+        IF from_value >= current_range_from_value THEN
+            WHILE current_range_from_value < from_value LOOP
                     current_range_from_value := current_range_from_value + table_partition_interval;
             END LOOP;
             current_range_to_value := current_range_from_value + table_partition_interval;
         ELSE
-            WHILE current_range_from_value > start_from LOOP
+            WHILE current_range_from_value > from_value LOOP
                     current_range_from_value := current_range_from_value - table_partition_interval;
             END LOOP;
             current_range_to_value := current_range_from_value + table_partition_interval;
@@ -186,7 +188,7 @@ BEGIN
         END IF;
     END IF;
 
-    WHILE current_range_from_value < to_date LOOP
+    WHILE current_range_from_value < to_value LOOP
         /*
          * Check whether partition with given range has already been created
          * Since partition interval can be given with different types, we are converting
@@ -222,13 +224,13 @@ BEGIN
             manual_partition_to_value_text;
         END IF;
 
-        IF table_partition_column_type_name = 'date' THEN
+        IF partition_column_type = 'date'::regtype THEN
             SELECT current_range_from_value::date::text INTO current_range_from_value_text;
             SELECT current_range_to_value::date::text INTO current_range_to_value_text;
-        ELSIF table_partition_column_type_name = 'timestamp without time zone' THEN
+        ELSIF partition_column_type = 'timestamp without time zone'::regtype THEN
             SELECT current_range_from_value::timestamp::text INTO current_range_from_value_text;
             SELECT current_range_to_value::timestamp::text INTO current_range_to_value_text;
-        ELSIF table_partition_column_type_name = 'timestamp with time zone' THEN
+        ELSIF partition_column_type = 'timestamp with time zone'::regtype THEN
             SELECT current_range_from_value::timestamptz::text INTO current_range_from_value_text;
             SELECT current_range_to_value::timestamptz::text INTO current_range_to_value_text;
         ELSE
@@ -253,7 +255,7 @@ $$;
 
 COMMENT ON FUNCTION pg_catalog.get_missing_time_partition_ranges(
 	table_name regclass,
-    to_date timestamptz,
-    start_from timestamptz,
+    to_value timestamptz,
+    from_value timestamptz,
     partition_interval INTERVAL)
 IS 'get missing partitions ranges for table within the range using the given interval';
