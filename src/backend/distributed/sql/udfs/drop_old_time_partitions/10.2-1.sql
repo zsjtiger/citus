@@ -1,4 +1,4 @@
--- Heavily inspired by the procedure alter_old_partitions_set_access_method
+/* heavily inspired by the procedure alter_old_partitions_set_access_method */
 CREATE OR REPLACE PROCEDURE pg_catalog.drop_old_time_partitions(
 	parent_table_name regclass,
 	older_than timestamptz)

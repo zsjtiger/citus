@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION pg_catalog.create_time_partitions(
     table_name regclass,
-    to_value timestamptz,
     partition_interval INTERVAL,
+    to_value timestamptz,
     from_value timestamptz DEFAULT now())
 returns boolean
 LANGUAGE plpgsql
@@ -46,7 +46,7 @@ END;
 $$;
 COMMENT ON FUNCTION pg_catalog.create_time_partitions(
     table_name regclass,
-    to_value timestamptz,
     partition_interval INTERVAL,
+    to_value timestamptz,
     from_value timestamptz)
 IS 'create time partitions for the given range';

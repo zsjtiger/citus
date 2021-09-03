@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION pg_catalog.get_missing_time_partition_ranges(
     table_name regclass,
-    to_value timestamptz,
     partition_interval INTERVAL,
+    to_value timestamptz,
     from_value timestamptz DEFAULT now())
 returns table(
     partition_name text,
@@ -215,7 +215,7 @@ $$;
 
 COMMENT ON FUNCTION pg_catalog.get_missing_time_partition_ranges(
 	table_name regclass,
-    to_value timestamptz,
     partition_interval INTERVAL,
+    to_value timestamptz,
     from_value timestamptz)
 IS 'get missing partitions ranges for table within the range using the given interval';
