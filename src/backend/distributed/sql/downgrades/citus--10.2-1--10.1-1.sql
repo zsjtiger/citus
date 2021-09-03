@@ -20,6 +20,8 @@ DROP FUNCTION pg_catalog.citus_internal_update_relation_colocation(oid, integer)
 DROP FUNCTION pg_catalog.create_time_partitions(regclass,timestamp with time zone,timestamp with time zone, interval);
 DROP FUNCTION pg_catalog.get_missing_time_partition_ranges(regclass,timestamp with time zone,timestamp with time zone, interval);
 
+DROP PROCEDURE pg_catalog.drop_old_time_partitions(regclass, timestamptz);
+
 REVOKE ALL ON FUNCTION pg_catalog.worker_record_sequence_dependency(regclass,regclass,name) FROM PUBLIC;
 ALTER TABLE pg_catalog.pg_dist_placement DROP CONSTRAINT placement_shardid_groupid_unique_index;
 
