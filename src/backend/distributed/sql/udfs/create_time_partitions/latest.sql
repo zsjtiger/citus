@@ -28,7 +28,7 @@ BEGIN
      */
     FOR missing_partition_record IN
         SELECT *
-        FROM get_missing_time_partition_ranges(table_name, to_value, partition_interval, from_value)
+        FROM get_missing_time_partition_ranges(table_name, partition_interval, to_value, from_value)
     LOOP
         EXECUTE format('CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
         schema_name_text,

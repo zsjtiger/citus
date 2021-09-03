@@ -63,7 +63,7 @@ BEGIN
         INTO is_multiple_days;
 
         IF NOT is_multiple_days THEN
-            RAISE 'partition interval of date partitioned column must be day or multiple days';
+            RAISE 'partition interval of date partitioned table must be day or multiple days';
         END IF;
     END IF;
 
@@ -179,7 +179,7 @@ BEGIN
             parent_table = table_name;
 
         IF found THEN
-            RAISE 'Partition with the range from % to % does not align with the initial partition. Please make sure that no gap(s) exists between existing partitions', -- TODO: Check the message
+            RAISE 'Partition with the range from % to % does not align with the given range and partition_interval',
             manual_partition_from_value_text,
             manual_partition_to_value_text;
         END IF;
