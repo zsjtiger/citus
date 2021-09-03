@@ -1,8 +1,8 @@
 CREATE OR REPLACE FUNCTION pg_catalog.create_time_partitions(
     table_name regclass,
     to_value timestamptz,
-    from_value timestamptz DEFAULT now(),
-    partition_interval INTERVAL DEFAULT NULL)
+    partition_interval INTERVAL,
+    from_value timestamptz DEFAULT now())
 returns boolean
 LANGUAGE plpgsql
 AS $$
@@ -28,7 +28,7 @@ BEGIN
      */
     FOR missing_partition_record IN
         SELECT *
-        FROM get_missing_time_partition_ranges(table_name, to_value, from_value, partition_interval)
+        FROM get_missing_time_partition_ranges(table_name, to_value, partition_interval, from_value)
     LOOP
         EXECUTE format('CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
         schema_name_text,
@@ -47,6 +47,6 @@ $$;
 COMMENT ON FUNCTION pg_catalog.create_time_partitions(
     table_name regclass,
     to_value timestamptz,
-    from_value timestamptz,
-    partition_interval INTERVAL)
+    partition_interval INTERVAL,
+    from_value timestamptz)
 IS 'create time partitions for the given range';
