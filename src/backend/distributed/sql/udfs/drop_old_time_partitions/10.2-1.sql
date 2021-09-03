@@ -1,23 +1,42 @@
-/* heavily inspired by the procedure alter_old_partitions_set_access_method */
+-- heavily inspired by the procedure alter_old_partitions_set_access_method
 CREATE OR REPLACE PROCEDURE pg_catalog.drop_old_time_partitions(
 	parent_table_name regclass,
 	older_than timestamptz)
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    -- properties of the partitioned table
+    number_of_partition_columns int;
+    partition_column_index int;
+    partition_column_type regtype;
+
     r record;
-	schema_name_text text;
 BEGIN
-	/* first check whether we can convert all the to_value's to timestamptz */
-	BEGIN
-		PERFORM
-		FROM pg_catalog.time_partitions
-		WHERE parent_table = parent_table_name
-		AND to_value IS NOT NULL
-		AND to_value::timestamptz <= older_than;
-	EXCEPTION WHEN invalid_datetime_format THEN
-		RAISE 'partition column of % cannot be cast to a timestamptz', parent_table_name;
-	END;
+    -- check whether the table is time partitioned table, if not error out
+    SELECT partnatts, partattrs[0]
+    INTO number_of_partition_columns, partition_column_index
+    FROM pg_catalog.pg_partitioned_table
+    WHERE partrelid = parent_table_name;
+
+    IF NOT FOUND THEN
+        RAISE '% is not partitioned', parent_table_name::text;
+    ELSIF number_of_partition_columns <> 1 THEN
+        RAISE 'partitioned tables with multiple partition columns are not supported';
+    END IF;
+
+    -- get datatype here to check interval-table type
+    SELECT atttypid
+    INTO partition_column_type
+    FROM pg_attribute
+    WHERE attrelid = parent_table_name::oid
+    AND attnum = partition_column_index;
+
+    -- we currently only support partitioning by date, timestamp, and timestamptz
+    IF partition_column_type <> 'date'::regtype
+    AND partition_column_type <> 'timestamp'::regtype
+    AND partition_column_type <> 'timestamptz'::regtype  THEN
+        RAISE 'type of the partition column of the table % must be date, timestamp or timestamptz', parent_table_name;
+    END IF;
 
     FOR r IN
 		SELECT partition, nspname AS schema_name, relname AS table_name, from_value, to_value

@@ -7,14 +7,14 @@ returns boolean
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    /* partitioned table name */
+    -- partitioned table name
     schema_name_text name;
     table_name_text name;
 
-    /* record for to-be-created parttion */
+    -- record for to-be-created parttion
     missing_partition_record record;
 
-    /* result indiciates whether any partitions were created */
+    -- result indiciates whether any partitions were created
     partition_created bool := false;
 BEGIN
     SELECT nspname, relname
@@ -22,10 +22,8 @@ BEGIN
     FROM pg_class JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid
     WHERE pg_class.oid = table_name::oid;
 
-    /*
-     * Get missing partition range info using the get_missing_partition_ranges
-     * and create partitions using that info.
-     */
+    -- Get missing partition range info using the get_missing_partition_ranges
+    -- and create partitions using that info.
     FOR missing_partition_record IN
         SELECT *
         FROM get_missing_time_partition_ranges(table_name, partition_interval, to_value, from_value)

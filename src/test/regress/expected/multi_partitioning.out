@@ -2219,7 +2219,8 @@ BEGIN;
 (5 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('date_partitioned_table', INTERVAL '2 days', '2021-01-05', '2020-12-30');
-ERROR:  Partition with the range from 01-01-2021 to 01-02-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2021_01_01 with the range from 01-01-2021 to 01-02-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2235,7 +2236,8 @@ BEGIN;
 (4 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('date_partitioned_table', INTERVAL '2 days', '2021-01-05', '2020-12-30');
-ERROR:  Partition with the range from 01-01-2021 to 01-02-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2021_01_01 with the range from 01-01-2021 to 01-02-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2257,14 +2259,16 @@ BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
   CREATE TABLE date_partitioned_table_2021_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-02') TO ('2021-01-04');
   SELECT * FROM get_missing_time_partition_ranges('date_partitioned_table', INTERVAL '2 days', '2021-01-05', '2020-12-30');
-ERROR:  Partition with the range from 01-01-2021 to 01-02-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2021_01_01 with the range from 01-01-2021 to 01-02-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-03');
   CREATE TABLE date_partitioned_table_2021_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-04') TO ('2021-01-06');
   SELECT * FROM get_missing_time_partition_ranges('date_partitioned_table', INTERVAL '2 days', '2021-01-15', '2020-12-30');
-ERROR:  Partition with the range from 01-04-2021 to 01-06-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2021_01_02 with the range from 01-04-2021 to 01-06-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 DROP TABLE date_partitioned_table;
@@ -2391,7 +2395,8 @@ BEGIN;
 (5 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2407,7 +2412,8 @@ BEGIN;
 (4 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2429,14 +2435,16 @@ BEGIN;
   CREATE TABLE tstz_partitioned_table_2021_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
   CREATE TABLE tstz_partitioned_table_2021_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
   CREATE TABLE tstz_partitioned_table_2021_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
   CREATE TABLE tstz_partitioned_table_2021_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', INTERVAL '2 days', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Mon Jan 04 00:00:00 2021 PST to Wed Jan 06 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_02 with the range from Mon Jan 04 00:00:00 2021 PST to Wed Jan 06 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 DROP TABLE tstz_partitioned_table;
@@ -2563,7 +2571,8 @@ BEGIN;
 (5 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2579,7 +2588,8 @@ BEGIN;
 (4 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -2601,14 +2611,16 @@ BEGIN;
   CREATE TABLE tswtz_partitioned_table_2021_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
   CREATE TABLE tswtz_partitioned_table_2021_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
   SELECT * FROM get_missing_time_partition_ranges('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
   CREATE TABLE tswtz_partitioned_table_2021_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
   CREATE TABLE tswtz_partitioned_table_2021_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
   SELECT * FROM get_missing_time_partition_ranges('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Mon Jan 04 00:00:00 2021 to Wed Jan 06 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2021_01_02 with the range from Mon Jan 04 00:00:00 2021 to Wed Jan 06 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 DROP TABLE tswtz_partitioned_table;
@@ -2697,11 +2709,11 @@ CREATE TABLE date_partitioned_table(
 SELECT create_time_partitions('date_partitioned_table', INTERVAL '6 hours', '2022-01-01', '2021-01-01');
 ERROR:  partition interval of date partitioned table must be day or multiple days
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 SELECT create_time_partitions('date_partitioned_table', INTERVAL '1 week 1 day 1 hour', '2022-01-01', '2021-01-01');
 ERROR:  partition interval of date partitioned table must be day or multiple days
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 -- test with various intervals
 BEGIN;
   SELECT create_time_partitions('date_partitioned_table', INTERVAL '1 day', '2021-02-01', '2021-01-01');
@@ -2898,9 +2910,10 @@ BEGIN;
 (6 rows)
 
   SELECT create_time_partitions('date_partitioned_table', INTERVAL '2 days', '2021-01-15', '2020-12-25');
-ERROR:  Partition with the range from 12-30-2020 to 12-31-2020 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_p2020_12_30 with the range from 12-30-2020 to 12-31-2020 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
@@ -2923,9 +2936,10 @@ BEGIN;
 (6 rows)
 
   SELECT create_time_partitions('date_partitioned_table', INTERVAL '2 days', '2021-01-05', '2020-12-30');
-ERROR:  Partition with the range from 12-30-2020 to 12-31-2020 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_p2020_12_30 with the range from 12-30-2020 to 12-31-2020 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-03');
@@ -2954,17 +2968,19 @@ BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-02');
   CREATE TABLE date_partitioned_table_2020_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-02') TO ('2021-01-04');
   SELECT create_time_partitions('date_partitioned_table', INTERVAL '1 day', '2021-01-05', '2020-12-30');
-ERROR:  Partition with the range from 01-02-2021 to 01-04-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2020_01_02 with the range from 01-02-2021 to 01-04-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE date_partitioned_table_2021_01_01 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-01') TO ('2021-01-03');
   CREATE TABLE date_partitioned_table_2021_01_02 PARTITION OF date_partitioned_table FOR VALUES FROM ('2021-01-04') TO ('2021-01-06');
   SELECT create_time_partitions('date_partitioned_table', INTERVAL '2 days', '2021-01-15', '2020-12-30');
-ERROR:  Partition with the range from 01-04-2021 to 01-06-2021 does not align with the given range and partition_interval
+ERROR:  partition date_partitioned_table_2021_01_02 with the range from 01-04-2021 to 01-06-2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 DROP TABLE date_partitioned_table;
 -- 2) test timestamp with time zone partitioend table
@@ -3140,7 +3156,8 @@ BEGIN;
 (6 rows)
 
   SELECT * FROM get_missing_time_partition_ranges('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Wed Dec 30 00:00:00 2020 PST to Thu Dec 31 00:00:00 2020 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_p2020_12_30 with the range from Wed Dec 30 00:00:00 2020 PST to Thu Dec 31 00:00:00 2020 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
 ROLLBACK;
 BEGIN;
@@ -3164,9 +3181,10 @@ BEGIN;
 (6 rows)
 
   SELECT create_time_partitions('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Wed Dec 30 00:00:00 2020 PST to Thu Dec 31 00:00:00 2020 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_p2020_12_30 with the range from Wed Dec 30 00:00:00 2020 PST to Thu Dec 31 00:00:00 2020 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE tstz_partitioned_table_2021_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
@@ -3195,17 +3213,19 @@ BEGIN;
   CREATE TABLE tstz_partitioned_table_2021_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
   CREATE TABLE tstz_partitioned_table_2021_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
   SELECT create_time_partitions('tstz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_01 with the range from Fri Jan 01 00:00:00 2021 PST to Sat Jan 02 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE tstz_partitioned_table_2021_01_01 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
   CREATE TABLE tstz_partitioned_table_2021_01_02 PARTITION OF tstz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
   SELECT create_time_partitions('tstz_partitioned_table', INTERVAL '2 days', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Mon Jan 04 00:00:00 2021 PST to Wed Jan 06 00:00:00 2021 PST does not align with the given range and partition_interval
+ERROR:  partition tstz_partitioned_table_2021_01_02 with the range from Mon Jan 04 00:00:00 2021 PST to Wed Jan 06 00:00:00 2021 PST does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 DROP TABLE tstz_partitioned_table;
 -- 3) test timestamp without time zone partitioend table
@@ -3386,9 +3406,10 @@ BEGIN;
 (6 rows)
 
   SELECT create_time_partitions('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Wed Dec 30 00:00:00 2020 to Thu Dec 31 00:00:00 2020 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_p2020_12_30 with the range from Wed Dec 30 00:00:00 2020 to Thu Dec 31 00:00:00 2020 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE tswtz_partitioned_table_2021_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
@@ -3411,9 +3432,10 @@ BEGIN;
 (6 rows)
 
   SELECT create_time_partitions('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Wed Dec 30 00:00:00 2020 to Thu Dec 31 00:00:00 2020 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_p2020_12_30 with the range from Wed Dec 30 00:00:00 2020 to Thu Dec 31 00:00:00 2020 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
@@ -3442,17 +3464,19 @@ BEGIN;
   CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-02 00:00:00');
   CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-02 00:00:00') TO ('2021-01-04 00:00:00');
   SELECT create_time_partitions('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-05 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2020_01_01 with the range from Fri Jan 01 00:00:00 2021 to Sat Jan 02 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 BEGIN;
   CREATE TABLE tswtz_partitioned_table_2020_01_01 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-01 00:00:00') TO ('2021-01-03 00:00:00');
   CREATE TABLE tswtz_partitioned_table_2020_01_02 PARTITION OF tswtz_partitioned_table FOR VALUES FROM ('2021-01-04 00:00:00') TO ('2021-01-06 00:00:00');
   SELECT create_time_partitions('tswtz_partitioned_table', INTERVAL '2 days', '2021-01-15 00:00:00', '2020-12-30 00:00:00');
-ERROR:  Partition with the range from Mon Jan 04 00:00:00 2021 to Wed Jan 06 00:00:00 2021 does not align with the given range and partition_interval
+ERROR:  partition tswtz_partitioned_table_2020_01_02 with the range from Mon Jan 04 00:00:00 2021 to Wed Jan 06 00:00:00 2021 does not align with the initial partition given the partition interval
+HINT:  Only use partitions of the same size, without gaps between partitions.
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 ROLLBACK;
 DROP TABLE tswtz_partitioned_table;
 -- 4) test with weird name
@@ -3552,11 +3576,11 @@ SELECT create_distributed_table('date_distributed_partitioned_table', 'measureid
 SELECT create_time_partitions('date_distributed_partitioned_table', INTERVAL '6 hours', '2022-01-01', '2021-01-01');
 ERROR:  partition interval of date partitioned table must be day or multiple days
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 SELECT create_time_partitions('date_distributed_partitioned_table', INTERVAL '1 week 1 day 1 hour', '2022-01-01', '2021-01-01');
 ERROR:  partition interval of date partitioned table must be day or multiple days
 CONTEXT:  PL/pgSQL function get_missing_time_partition_ranges(regclass,interval,timestamp with time zone,timestamp with time zone) line XX at RAISE
-PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 22 at FOR over SELECT rows
+PL/pgSQL function create_time_partitions(regclass,interval,timestamp with time zone,timestamp with time zone) line 20 at FOR over SELECT rows
 -- test with various intervals
 BEGIN;
   SELECT create_time_partitions('date_distributed_partitioned_table', INTERVAL '1 day', '2021-02-01', '2021-01-01');
