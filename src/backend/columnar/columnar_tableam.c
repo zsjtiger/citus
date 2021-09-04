@@ -574,13 +574,20 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		return false;
 	}
 
-	if (!StripeIsFlushed(stripeMetadata))
+	if (StripeWriteIsAborted(stripeMetadata))
 	{
 		/*
 		 * We only expect to see un-flushed stripes when checking against
 		 * constraint violation. In that case, indexAM provides dirty
 		 * snapshot to index_fetch_tuple callback.
 		 */
+		Assert(snapshot->snapshot_type == SNAPSHOT_DIRTY);
+		return false;
+	}
+
+	if (StripeWriteIsInProgress(stripeMetadata))
+	{
+		/* similar to aborted writes .. */
 		Assert(snapshot->snapshot_type == SNAPSHOT_DIRTY);
 
 		/*

@@ -51,6 +51,7 @@
 #include "port.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
+#include "storage/procarray.h"
 #include "storage/smgr.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -91,7 +92,7 @@ static void GetHighestUsedAddressAndId(uint64 storageId,
 static StripeMetadata * UpdateStripeMetadataRow(uint64 storageId, uint64 stripeId,
 												bool *update, Datum *newValues);
 static List * ReadDataFileStripeList(uint64 storageId, Snapshot snapshot);
-static StripeMetadata * BuildStripeMetadata(Datum *datumArray);
+static StripeMetadata * BuildStripeMetadata(HeapTuple heapTuple);
 static uint32 * ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32
 										chunkGroupCount, Snapshot snapshot);
 static Oid ColumnarStorageIdSequenceRelationId(void);
@@ -707,13 +708,24 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 bool
 StripeIsFlushed(StripeMetadata *stripeMetadata)
 {
-	/*
-	 * We insert dummy stripe metadata entry when inserting the first row.
-	 * For this reason, rowCount being equal to 0 cannot mean a valid stripe
-	 * with 0 rows but a stripe that is not flushed to disk, probably because
-	 * of an aborted xact.
-	 */
-	return stripeMetadata->rowCount > 0;
+	return stripeMetadata->rowCount > 0 &&
+		   !TransactionIdDidAbort(stripeMetadata->entryXMin);
+}
+
+
+bool
+StripeWriteIsAborted(StripeMetadata *stripeMetadata)
+{
+	return TransactionIdDidAbort(stripeMetadata->entryXMin);
+}
+
+
+bool
+StripeWriteIsInProgress(StripeMetadata *stripeMetadata)
+{
+	return stripeMetadata->rowCount == 0 &&
+		   !TransactionIdDidAbort(stripeMetadata->entryXMin) &&
+		   !TransactionIdDidCommit(stripeMetadata->entryXMin);
 }
 
 
@@ -780,16 +792,11 @@ StripeMetadataLookupRowNumber(Relation relation, uint64 rowNumber, Snapshot snap
 	{
 		scanDirection = ForwardScanDirection;
 	}
+
 	HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, scanDirection);
 	if (HeapTupleIsValid(heapTuple))
 	{
-		TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-
-		foundStripeMetadata = BuildStripeMetadata(datumArray);
-		CheckStripeMetadataConsistency(foundStripeMetadata);
+		foundStripeMetadata = BuildStripeMetadata(heapTuple);
 	}
 
 	systable_endscan_ordered(scanDescriptor);
@@ -808,24 +815,54 @@ StripeMetadataLookupRowNumber(Relation relation, uint64 rowNumber, Snapshot snap
 static void
 CheckStripeMetadataConsistency(StripeMetadata *stripeMetadata)
 {
-	if (StripeIsFlushed(stripeMetadata))
+	bool stripeLooksInProgress =
+		stripeMetadata->rowCount == 0 && stripeMetadata->chunkCount == 0 &&
+		stripeMetadata->fileOffset == ColumnarInvalidLogicalOffset &&
+		stripeMetadata->dataLength == 0;
+
+	/*
+	 * Even if stripe is flushed, fileOffset and dataLength might be equal
+	 * to 0 for zero column tables, but those two should still be consistent
+	 * with respect to each other.
+	 */
+	bool stripeLooksFlushed =
+		stripeMetadata->rowCount > 0 && stripeMetadata->chunkCount > 0 &&
+		((stripeMetadata->fileOffset != ColumnarInvalidLogicalOffset &&
+		  stripeMetadata->dataLength > 0) ||
+		 (stripeMetadata->fileOffset == ColumnarInvalidLogicalOffset &&
+		  stripeMetadata->dataLength == 0));
+
+	if (StripeIsFlushed(stripeMetadata) && stripeLooksFlushed)
 	{
+		/*
+		 * If stripe was flushed to disk, then we expect stripe to store
+		 * at least one tuple.
+		 */
 		return;
 	}
-
-	if (stripeMetadata->rowCount > 0 || stripeMetadata->chunkCount > 0 ||
-		stripeMetadata->fileOffset != ColumnarInvalidLogicalOffset ||
-		stripeMetadata->dataLength > 0)
+	else if (StripeWriteIsInProgress(stripeMetadata) && stripeLooksInProgress)
 	{
 		/*
 		 * If stripe was not flushed to disk, then values of given four
 		 * fields should match the columns inserted by
 		 * InsertEmptyStripeMetadataRow.
 		 */
-		ereport(ERROR, (errmsg("unexpected stripe state, stripe with id="
-							   UINT64_FORMAT " was not flushed properly",
-							   stripeMetadata->id)));
+		return;
 	}
+	else if (StripeWriteIsAborted(stripeMetadata) &&
+			 (stripeLooksInProgress || stripeLooksFlushed))
+	{
+		/*
+		 * Stripe metadata entry for an aborted write can be complete or
+		 * incomplete. We might have aborted the transaction before or after
+		 * inserting into stripe metadata.
+		 */
+		return;
+	}
+
+	ereport(ERROR, (errmsg("unexpected stripe state, stripe metadata "
+						   "entry for stripe with id=" UINT64_FORMAT
+						   " is not consistent", stripeMetadata->id)));
 }
 
 
@@ -853,12 +890,7 @@ FindStripeWithHighestRowNumber(Relation relation, Snapshot snapshot)
 	HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, BackwardScanDirection);
 	if (HeapTupleIsValid(heapTuple))
 	{
-		TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-
-		stripeWithHighestRowNumber = BuildStripeMetadata(datumArray);
+		stripeWithHighestRowNumber = BuildStripeMetadata(heapTuple);
 	}
 
 	systable_endscan_ordered(scanDescriptor);
@@ -1154,10 +1186,7 @@ UpdateStripeMetadataRow(uint64 storageId, uint64 stripeId, bool *update,
 	table_close(columnarStripes, AccessShareLock);
 
 	/* return StripeMetadata object built from modified tuple */
-	Datum datumArray[Natts_columnar_stripe];
-	bool isNullArray[Natts_columnar_stripe];
-	heap_deform_tuple(modifiedTuple, tupleDescriptor, datumArray, isNullArray);
-	return BuildStripeMetadata(datumArray);
+	return BuildStripeMetadata(modifiedTuple);
 }
 
 
@@ -1180,7 +1209,6 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
 	Relation columnarStripes = table_open(columnarStripesOid, AccessShareLock);
 	Relation index = index_open(ColumnarStripeFirstRowNumberIndexRelationId(),
 								AccessShareLock);
-	TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
 
 	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarStripes, index,
 															snapshot, 1,
@@ -1189,11 +1217,7 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
 	while (HeapTupleIsValid(heapTuple = systable_getnext_ordered(scanDescriptor,
 																 ForwardScanDirection)))
 	{
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-		StripeMetadata *stripeMetadata = BuildStripeMetadata(datumArray);
+		StripeMetadata *stripeMetadata = BuildStripeMetadata(heapTuple);
 		stripeMetadataList = lappend(stripeMetadataList, stripeMetadata);
 	}
 
@@ -1209,8 +1233,17 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
  * BuildStripeMetadata builds a StripeMetadata object from given datumArray.
  */
 static StripeMetadata *
-BuildStripeMetadata(Datum *datumArray)
+BuildStripeMetadata(HeapTuple heapTuple)
 {
+	Relation columnarStripes = RelationIdGetRelation(ColumnarStripeRelationId());
+
+	Datum datumArray[Natts_columnar_stripe];
+	bool isNullArray[Natts_columnar_stripe];
+	heap_deform_tuple(heapTuple, RelationGetDescr(columnarStripes),
+					  datumArray, isNullArray);
+
+	RelationClose(columnarStripes);
+
 	StripeMetadata *stripeMetadata = palloc0(sizeof(StripeMetadata));
 	stripeMetadata->id = DatumGetInt64(datumArray[Anum_columnar_stripe_stripe - 1]);
 	stripeMetadata->fileOffset = DatumGetInt64(
@@ -1227,6 +1260,10 @@ BuildStripeMetadata(Datum *datumArray)
 		datumArray[Anum_columnar_stripe_row_count - 1]);
 	stripeMetadata->firstRowNumber = DatumGetUInt64(
 		datumArray[Anum_columnar_stripe_first_row_number - 1]);
+	stripeMetadata->entryXMin = HeapTupleHeaderGetXmin(heapTuple->t_data);
+
+	CheckStripeMetadataConsistency(stripeMetadata);
+
 	return stripeMetadata;
 }
 
