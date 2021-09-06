@@ -254,50 +254,55 @@ CreateColumnarScanMemoryContext(void)
  */
 static ColumnarReadState *
 init_columnar_read_state(Relation relation, TupleDesc tupdesc, Bitmapset *attr_needed,
-						 List *scanQual, MemoryContext scanContext, Snapshot snapshot)
+						 List *scanQual, MemoryContext scanContext, Snapshot snapshot,
+						 bool flushWrites)
 {
 	MemoryContext oldContext = MemoryContextSwitchTo(scanContext);
 
-	Oid relfilenode = relation->rd_node.relNode;
-	FlushWriteStateForRelfilenode(relfilenode, GetCurrentSubTransactionId());
-
 	bool snapshotRegisteredByUs = false;
-	if (snapshot != InvalidSnapshot && IsMVCCSnapshot(snapshot))
+
+	if (flushWrites)
 	{
-		/*
-		 * If we flushed any pending writes, then we should guarantee that
-		 * those writes are visible to us too. For this reason, if given
-		 * snapshot is an MVCC snapshot, then we set its curcid to current
-		 * command id.
-		 *
-		 * For simplicity, we do that even if we didn't flush any writes
-		 * since we don't see any problem with that.
-		 *
-		 * XXX: We should either not update cid if we are executing a FETCH
-		 * (from cursor) command, or we should have a better way to deal with
-		 * pending writes, see the discussion in
-		 * https://github.com/citusdata/citus/issues/5231.
-		 */
-		PushCopiedSnapshot(snapshot);
+		Oid relfilenode = relation->rd_node.relNode;
+		FlushWriteStateForRelfilenode(relfilenode, GetCurrentSubTransactionId());
 
-		/* now our snapshot is the active one */
-		UpdateActiveSnapshotCommandId();
-		snapshot = GetActiveSnapshot();
-		RegisterSnapshot(snapshot);
+		if (snapshot != InvalidSnapshot && IsMVCCSnapshot(snapshot))
+		{
+			/*
+			 * If we flushed any pending writes, then we should guarantee that
+			 * those writes are visible to us too. For this reason, if given
+			 * snapshot is an MVCC snapshot, then we set its curcid to current
+			 * command id.
+			 *
+			 * For simplicity, we do that even if we didn't flush any writes
+			 * since we don't see any problem with that.
+			 *
+			 * XXX: We should either not update cid if we are executing a FETCH
+			 * (from cursor) command, or we should have a better way to deal with
+			 * pending writes, see the discussion in
+			 * https://github.com/citusdata/citus/issues/5231.
+			 */
+			PushCopiedSnapshot(snapshot);
 
-		/*
-		 * To be able to use UpdateActiveSnapshotCommandId, we pushed the
-		 * copied snapshot to the stack. However, we don't need to keep it
-		 * there since we will anyway rely on ColumnarReadState->snapshot
-		 * during read operation.
-		 *
-		 * Note that since we registered the snapshot already, we guarantee
-		 * that PopActiveSnapshot won't free it.
-		 */
-		PopActiveSnapshot();
+			/* now our snapshot is the active one */
+			UpdateActiveSnapshotCommandId();
+			snapshot = GetActiveSnapshot();
+			RegisterSnapshot(snapshot);
 
-		/* not forget to unregister it when finishing read operation */
-		snapshotRegisteredByUs = true;
+			/*
+			 * To be able to use UpdateActiveSnapshotCommandId, we pushed the
+			 * copied snapshot to the stack. However, we don't need to keep it
+			 * there since we will anyway rely on ColumnarReadState->snapshot
+			 * during read operation.
+			 *
+			 * Note that since we registered the snapshot already, we guarantee
+			 * that PopActiveSnapshot won't free it.
+			 */
+			PopActiveSnapshot();
+
+			/* not forget to unregister it when finishing read operation */
+			snapshotRegisteredByUs = true;
+		}
 	}
 
 	List *neededColumnList = NeededColumnsList(tupdesc, attr_needed);
@@ -354,10 +359,12 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 	 */
 	if (scan->cs_readState == NULL)
 	{
+		bool flushWrites = true;
 		scan->cs_readState =
 			init_columnar_read_state(scan->cs_base.rs_rd, slot->tts_tupleDescriptor,
 									 scan->attr_needed, scan->scanQual,
-									 scan->scanContext, scan->cs_base.rs_snapshot);
+									 scan->scanContext, scan->cs_base.rs_snapshot,
+									 flushWrites);
 	}
 
 	ExecClearTuple(slot);
@@ -546,11 +553,12 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		/* no quals for index scan */
 		List *scanQual = NIL;
 
+		bool flushWrites = true;
 		scan->cs_readState = init_columnar_read_state(columnarRelation,
 													  slot->tts_tupleDescriptor,
 													  attr_needed, scanQual,
 													  scan->scanContext,
-													  snapshot);
+													  snapshot, flushWrites);
 	}
 
 	uint64 rowNumber = tid_to_row_number(*tid);
@@ -913,9 +921,11 @@ columnar_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 	Snapshot snapshot = SnapshotAny;
 
 	MemoryContext scanContext = CreateColumnarScanMemoryContext();
+	bool flushWrites = true;
 	ColumnarReadState *readState = init_columnar_read_state(OldHeap, sourceDesc,
 															attr_needed, scanQual,
-															scanContext, snapshot);
+															scanContext, snapshot,
+															flushWrites);
 
 	Datum *values = palloc0(sourceDesc->natts * sizeof(Datum));
 	bool *nulls = palloc0(sourceDesc->natts * sizeof(bool));
