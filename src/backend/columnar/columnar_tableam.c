@@ -137,6 +137,10 @@ static Datum * detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isn
 static ItemPointerData row_number_to_tid(uint64 rowNumber);
 static uint64 tid_to_row_number(ItemPointerData tid);
 static void ErrorIfInvalidRowNumber(uint64 rowNumber);
+static bool columnar_index_fetch_tuple_internal(struct IndexFetchTableData *sscan,
+												ItemPointer tid,
+												Snapshot snapshot,
+												TupleTableSlot *slot);
 static void ColumnarReportTotalVirtualBlocks(Relation relation, Snapshot snapshot,
 											 int progressArrIndex);
 static BlockNumber ColumnarGetNumberOfVirtualBlocks(Relation relation, Snapshot snapshot);
@@ -560,6 +564,19 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 													  scan->scanContext,
 													  snapshot, flushWrites);
 	}
+
+	return columnar_index_fetch_tuple_internal(sscan, tid, snapshot, slot);
+}
+
+
+static bool
+columnar_index_fetch_tuple_internal(struct IndexFetchTableData *sscan,
+									ItemPointer tid,
+									Snapshot snapshot,
+									TupleTableSlot *slot)
+{
+	IndexFetchColumnarData *scan = (IndexFetchColumnarData *) sscan;
+	Relation columnarRelation = scan->cs_base.rel;
 
 	uint64 rowNumber = tid_to_row_number(*tid);
 	StripeMetadata *stripeMetadata =
