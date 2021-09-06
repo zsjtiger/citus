@@ -140,7 +140,8 @@ static void ErrorIfInvalidRowNumber(uint64 rowNumber);
 static bool columnar_index_fetch_tuple_internal(struct IndexFetchTableData *sscan,
 												ItemPointer tid,
 												Snapshot snapshot,
-												TupleTableSlot *slot);
+												TupleTableSlot *slot,
+												bool *shouldReCheck);
 static void ColumnarReportTotalVirtualBlocks(Relation relation, Snapshot snapshot,
 											 int progressArrIndex);
 static BlockNumber ColumnarGetNumberOfVirtualBlocks(Relation relation, Snapshot snapshot);
@@ -557,15 +558,62 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		/* no quals for index scan */
 		List *scanQual = NIL;
 
-		bool flushWrites = true;
+		bool flushWrites = false;
 		scan->cs_readState = init_columnar_read_state(columnarRelation,
 													  slot->tts_tupleDescriptor,
 													  attr_needed, scanQual,
 													  scan->scanContext,
 													  snapshot, flushWrites);
+
+		bool shouldReCheck = false;
+		if (columnar_index_fetch_tuple_internal(sscan, tid, snapshot, slot,
+												&shouldReCheck))
+		{
+			/*
+			 * Found the tuple without needing to flush pending writes.
+			 *
+			 * Clear cs_readState before returning true so that next call
+			 * made to columnar_index_fetch_tuple doesn't assume pending
+			 * writes are flushed.
+			 */
+			scan->cs_readState = NULL;
+			return true;
+		}
+
+		if (!shouldReCheck)
+		{
+			/*
+			 * Couldn't found the tuple without needing to flush pending
+			 * writes. However, shouldReCheck being equal to false means that
+			 * flushing pending writes wouldn't help us to find the tuple, so
+			 * return false here.
+			 *
+			 * Clear cs_readState before returning so that next call made to
+			 * columnar_index_fetch_tuple doesn't assume pending writes are
+			 * flushed.
+			 */
+			scan->cs_readState = NULL;
+			return false;
+		}
+
+		flushWrites = true;
+		scan->cs_readState = init_columnar_read_state(columnarRelation,
+													  slot->tts_tupleDescriptor,
+													  attr_needed, scanQual,
+													  scan->scanContext,
+													  snapshot, flushWrites);
+
+		/*
+		 * Initialized the read state by flushing writes, fall through for a
+		 * second round of stripe metadata look-up.
+		 */
 	}
 
-	return columnar_index_fetch_tuple_internal(sscan, tid, snapshot, slot);
+	/*
+	 * Normal case, flushed the pending writes already. No need to worry
+	 * about recheck.
+	 */
+	return columnar_index_fetch_tuple_internal(sscan, tid, snapshot, slot, NULL);
 }
 
 
@@ -573,8 +621,15 @@ static bool
 columnar_index_fetch_tuple_internal(struct IndexFetchTableData *sscan,
 									ItemPointer tid,
 									Snapshot snapshot,
-									TupleTableSlot *slot)
+									TupleTableSlot *slot,
+									bool *shouldReCheck)
 {
+	if (shouldReCheck)
+	{
+		/* initialize in case caller didn't */
+		*shouldReCheck = false;
+	}
+
 	IndexFetchColumnarData *scan = (IndexFetchColumnarData *) sscan;
 	Relation columnarRelation = scan->cs_base.rel;
 
@@ -610,18 +665,38 @@ columnar_index_fetch_tuple_internal(struct IndexFetchTableData *sscan,
 	}
 	else if (StripeWriteInProgress(stripeMetadata))
 	{
-		/* similar to aborted writes .. */
-		Assert(snapshot->snapshot_type == SNAPSHOT_DIRTY);
+		if (FindStripeWithMatchingFirstRowNumber(columnarRelation, rowNumber,
+												 SnapshotSelf))
+		{
+			/*
+			 * Stripe is visible to me, so it must be written by me. Since
+			 * caller might want to use tupleslot datums for some reason, do
+			 * a second round, but this time by first flushing our writes.
+			 *
+			 * Return false so that caller checks the value of shouldReCheck.
+			 */
+			if (shouldReCheck)
+			{
+				*shouldReCheck = true;
+			}
 
-		/*
-		 * Stripe that "might" contain the tuple with rowNumber is not
-		 * flushed yet. Here we set all attributes of given tupleslot to NULL
-		 * before returning true and expect the indexAM callback that called
-		 * us --possibly to check against constraint violation-- blocks until
-		 * writer transaction commits or aborts, without requiring us to fill
-		 * the tupleslot properly.
-		 */
-		memset(slot->tts_isnull, true, slot->tts_nvalid);
+			return false;
+		}
+		else
+		{
+			/* similar to aborted writes .. */
+			Assert(snapshot->snapshot_type == SNAPSHOT_DIRTY);
+
+			/*
+			 * Stripe that "might" contain the tuple with rowNumber is not
+			 * flushed yet. Here we set all attributes of given tupleslot to NULL
+			 * before returning true and expect the indexAM callback that called
+			 * us --possibly to check against constraint violation-- blocks until
+			 * writer transaction commits or aborts, without requiring us to fill
+			 * the tupleslot properly.
+			 */
+			memset(slot->tts_isnull, true, slot->tts_nvalid);
+		}
 	}
 	else
 	{
