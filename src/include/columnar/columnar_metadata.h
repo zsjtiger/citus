@@ -26,6 +26,15 @@ typedef struct StripeMetadata
 	uint64 rowCount;
 	uint64 id;
 	uint64 firstRowNumber;
+
+	/*
+	 * Together with rowCount, used to determine if write operation for this
+	 * stripe is "flushed", "aborted" or "in-progress" by StripeWriteFlushed,
+	 * StripeWriteAborted and StripeWriteInProgress.
+	 *
+	 * Note that one and only one of those three functions must return true
+	 * for a stripe.
+	 */
 	bool aborted;
 } StripeMetadata;
 

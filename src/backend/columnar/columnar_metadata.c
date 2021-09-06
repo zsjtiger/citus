@@ -702,8 +702,10 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 
 
 /*
- * StripeWriteFlushed returns true if stripe with stripeMetadata is flushed to
- * disk.
+ * StripeWriteFlushed returns true if given stripe is flushed.
+ *
+ * That means, either writer transaction committed or it is the current
+ * transaction, it flushed the stripe but did not commit yet.
  */
 bool
 StripeWriteFlushed(StripeMetadata *stripeMetadata)
@@ -712,6 +714,13 @@ StripeWriteFlushed(StripeMetadata *stripeMetadata)
 }
 
 
+/*
+ * StripeWriteFlushed returns true if writer (transaction) of given stripe
+ * aborted.
+ *
+ * Note that columnar.stripe entry for this stripe might or might not be
+ * complete.
+ */
 bool
 StripeWriteAborted(StripeMetadata *stripeMetadata)
 {
@@ -719,6 +728,13 @@ StripeWriteAborted(StripeMetadata *stripeMetadata)
 }
 
 
+/*
+ * StripeWriteFlushed returns true if writer (transaction) of given stripe
+ * is still in-progress.
+ *
+ * Note that it is not certain if writer transaction is the current one or
+ * belongs to another backend.
+ */
 bool
 StripeWriteInProgress(StripeMetadata *stripeMetadata)
 {
