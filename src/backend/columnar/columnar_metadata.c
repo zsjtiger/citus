@@ -804,31 +804,66 @@ StripeMetadataLookupRowNumber(Relation relation, uint64 rowNumber, Snapshot snap
 
 
 /*
- * CheckStripeMetadataConsistency errors out if given StripeMetadata object
- * belongs to an un-flushed stripe but some fields of it contradicts with
- * this fact.
+ * CheckStripeMetadataConsistency first decides if stripe write operation for
+ * given stripe is "flushed", "aborted" or "in-progress", then errors out if
+ * its metadata entry contradicts with this fact.
+ *
+ * Checks performed here are just to catch bugs, so it is encouraged to call
+ * this function whenever a StripeMetadata object is built from an heap tuple
+ * of columnar.stripe. Currently, BuildStripeMetadata is the only function
+ * that does this.
  */
 static void
 CheckStripeMetadataConsistency(StripeMetadata *stripeMetadata)
 {
-	if (StripeIsFlushed(stripeMetadata))
+	bool stripeLooksInProgress =
+		stripeMetadata->rowCount == 0 && stripeMetadata->chunkCount == 0 &&
+		stripeMetadata->fileOffset == ColumnarInvalidLogicalOffset &&
+		stripeMetadata->dataLength == 0;
+
+	/*
+	 * Even if stripe is flushed, fileOffset and dataLength might be equal
+	 * to 0 for zero column tables, but those two should still be consistent
+	 * with respect to each other.
+	 */
+	bool stripeLooksFlushed =
+		stripeMetadata->rowCount > 0 && stripeMetadata->chunkCount > 0 &&
+		((stripeMetadata->fileOffset != ColumnarInvalidLogicalOffset &&
+		  stripeMetadata->dataLength > 0) ||
+		 (stripeMetadata->fileOffset == ColumnarInvalidLogicalOffset &&
+		  stripeMetadata->dataLength == 0));
+
+	if (StripeWriteFlushed(stripeMetadata) && stripeLooksFlushed)
 	{
+		/*
+		 * If stripe was flushed to disk, then we expect stripe to store
+		 * at least one tuple.
+		 */
 		return;
 	}
-
-	if (stripeMetadata->rowCount > 0 || stripeMetadata->chunkCount > 0 ||
-		stripeMetadata->fileOffset != ColumnarInvalidLogicalOffset ||
-		stripeMetadata->dataLength > 0)
+	else if (StripeWriteInProgress(stripeMetadata) && stripeLooksInProgress)
 	{
 		/*
 		 * If stripe was not flushed to disk, then values of given four
 		 * fields should match the columns inserted by
 		 * InsertEmptyStripeMetadataRow.
 		 */
-		ereport(ERROR, (errmsg("unexpected stripe state, stripe with id="
-							   UINT64_FORMAT " was not flushed properly",
-							   stripeMetadata->id)));
+		return;
 	}
+	else if (StripeWriteAborted(stripeMetadata) &&
+			 (stripeLooksInProgress || stripeLooksFlushed))
+	{
+		/*
+		 * Stripe metadata entry for an aborted write can be complete or
+		 * incomplete. We might have aborted the transaction before or after
+		 * inserting into stripe metadata.
+		 */
+		return;
+	}
+
+	ereport(ERROR, (errmsg("unexpected stripe state, stripe metadata "
+						   "entry for stripe with id=" UINT64_FORMAT
+						   " is not consistent", stripeMetadata->id)));
 }
 
 
