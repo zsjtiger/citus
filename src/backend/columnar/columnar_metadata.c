@@ -91,7 +91,7 @@ static void GetHighestUsedAddressAndId(uint64 storageId,
 static StripeMetadata * UpdateStripeMetadataRow(uint64 storageId, uint64 stripeId,
 												bool *update, Datum *newValues);
 static List * ReadDataFileStripeList(uint64 storageId, Snapshot snapshot);
-static StripeMetadata * BuildStripeMetadata(Datum *datumArray);
+static StripeMetadata * BuildStripeMetadata(HeapTuple heapTuple);
 static uint32 * ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32
 										chunkGroupCount, Snapshot snapshot);
 static Oid ColumnarStorageIdSequenceRelationId(void);
@@ -783,13 +783,7 @@ StripeMetadataLookupRowNumber(Relation relation, uint64 rowNumber, Snapshot snap
 	HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, scanDirection);
 	if (HeapTupleIsValid(heapTuple))
 	{
-		TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-
-		foundStripeMetadata = BuildStripeMetadata(datumArray);
-		CheckStripeMetadataConsistency(foundStripeMetadata);
+		foundStripeMetadata = BuildStripeMetadata(heapTuple);
 	}
 
 	systable_endscan_ordered(scanDescriptor);
@@ -853,12 +847,7 @@ FindStripeWithHighestRowNumber(Relation relation, Snapshot snapshot)
 	HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, BackwardScanDirection);
 	if (HeapTupleIsValid(heapTuple))
 	{
-		TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-
-		stripeWithHighestRowNumber = BuildStripeMetadata(datumArray);
+		stripeWithHighestRowNumber = BuildStripeMetadata(heapTuple);
 	}
 
 	systable_endscan_ordered(scanDescriptor);
@@ -1154,10 +1143,7 @@ UpdateStripeMetadataRow(uint64 storageId, uint64 stripeId, bool *update,
 	table_close(columnarStripes, AccessShareLock);
 
 	/* return StripeMetadata object built from modified tuple */
-	Datum datumArray[Natts_columnar_stripe];
-	bool isNullArray[Natts_columnar_stripe];
-	heap_deform_tuple(modifiedTuple, tupleDescriptor, datumArray, isNullArray);
-	return BuildStripeMetadata(datumArray);
+	return BuildStripeMetadata(modifiedTuple);
 }
 
 
@@ -1180,7 +1166,6 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
 	Relation columnarStripes = table_open(columnarStripesOid, AccessShareLock);
 	Relation index = index_open(ColumnarStripeFirstRowNumberIndexRelationId(),
 								AccessShareLock);
-	TupleDesc tupleDescriptor = RelationGetDescr(columnarStripes);
 
 	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarStripes, index,
 															snapshot, 1,
@@ -1189,11 +1174,7 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
 	while (HeapTupleIsValid(heapTuple = systable_getnext_ordered(scanDescriptor,
 																 ForwardScanDirection)))
 	{
-		Datum datumArray[Natts_columnar_stripe];
-		bool isNullArray[Natts_columnar_stripe];
-
-		heap_deform_tuple(heapTuple, tupleDescriptor, datumArray, isNullArray);
-		StripeMetadata *stripeMetadata = BuildStripeMetadata(datumArray);
+		StripeMetadata *stripeMetadata = BuildStripeMetadata(heapTuple);
 		stripeMetadataList = lappend(stripeMetadataList, stripeMetadata);
 	}
 
@@ -1206,11 +1187,20 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot)
 
 
 /*
- * BuildStripeMetadata builds a StripeMetadata object from given datumArray.
+ * BuildStripeMetadata builds a StripeMetadata object from given heap tuple.
  */
 static StripeMetadata *
-BuildStripeMetadata(Datum *datumArray)
+BuildStripeMetadata(HeapTuple heapTuple)
 {
+	Relation columnarStripes = RelationIdGetRelation(ColumnarStripeRelationId());
+
+	Datum datumArray[Natts_columnar_stripe];
+	bool isNullArray[Natts_columnar_stripe];
+	heap_deform_tuple(heapTuple, RelationGetDescr(columnarStripes),
+					  datumArray, isNullArray);
+
+	RelationClose(columnarStripes);
+
 	StripeMetadata *stripeMetadata = palloc0(sizeof(StripeMetadata));
 	stripeMetadata->id = DatumGetInt64(datumArray[Anum_columnar_stripe_stripe - 1]);
 	stripeMetadata->fileOffset = DatumGetInt64(
@@ -1227,6 +1217,9 @@ BuildStripeMetadata(Datum *datumArray)
 		datumArray[Anum_columnar_stripe_row_count - 1]);
 	stripeMetadata->firstRowNumber = DatumGetUInt64(
 		datumArray[Anum_columnar_stripe_first_row_number - 1]);
+
+	CheckStripeMetadataConsistency(stripeMetadata);
+
 	return stripeMetadata;
 }
 
