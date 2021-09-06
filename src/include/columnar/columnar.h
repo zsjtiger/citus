@@ -207,6 +207,10 @@ extern void ColumnarFlushPendingWrites(ColumnarWriteState *state);
 extern void ColumnarEndWrite(ColumnarWriteState *state);
 extern bool ContainsPendingWrites(ColumnarWriteState *state);
 extern MemoryContext ColumnarWritePerTupleContext(ColumnarWriteState *state);
+extern uint64 ColumnarWriteStripeId(ColumnarWriteState *writeState);
+extern StripeBuffers * ColumnarWriteStripeBuffers(ColumnarWriteState *writeState);
+extern uint64 ColumnarWriteSerializedRowCount(ColumnarWriteState *writeState);
+extern ChunkData *ColumnarWriteChunkData(ColumnarWriteState *writeState);
 
 /* Function declarations for reading from columnar table */
 extern ColumnarReadState * ColumnarBeginRead(Relation relation,
@@ -222,6 +226,9 @@ extern void ColumnarRescan(ColumnarReadState *readState, List *scanQual);
 extern bool ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 									   uint64 rowNumber, Datum *columnValues,
 									   bool *columnNulls);
+extern void ColumnarReadBufferByRowNumber(ColumnarReadState *readState,
+			 		    	  			  uint64 rowNumber, Datum *columnValues,
+						   	  			  bool *columnNulls);
 extern void ColumnarEndRead(ColumnarReadState *state);
 extern void ColumnarResetRead(ColumnarReadState *readState);
 extern int64 ColumnarReadChunkGroupsFiltered(ColumnarReadState *state);
@@ -281,6 +288,7 @@ extern Datum columnar_relation_storageid(PG_FUNCTION_ARGS);
 extern ColumnarWriteState * columnar_init_write_state(Relation relation, TupleDesc
 													  tupdesc,
 													  SubTransactionId currentSubXid);
+extern ColumnarWriteState * FindWriteStateByStripeId(Oid relNode, uint64 stripeId);
 extern void FlushWriteStateForRelfilenode(Oid relfilenode, SubTransactionId
 										  currentSubXid);
 extern void FlushWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId
