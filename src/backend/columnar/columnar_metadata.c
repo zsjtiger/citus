@@ -701,11 +701,11 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 
 
 /*
- * StripeIsFlushed returns true if stripe with stripeMetadata is flushed to
+ * StripeWriteFlushed returns true if stripe with stripeMetadata is flushed to
  * disk.
  */
 bool
-StripeIsFlushed(StripeMetadata *stripeMetadata)
+StripeWriteFlushed(StripeMetadata *stripeMetadata)
 {
 	/*
 	 * We insert dummy stripe metadata entry when inserting the first row.

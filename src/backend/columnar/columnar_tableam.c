@@ -562,7 +562,7 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		return false;
 	}
 
-	if (StripeIsFlushed(stripeMetadata) &&
+	if (StripeWriteFlushed(stripeMetadata) &&
 		!ColumnarReadRowByRowNumber(scan->cs_readState, rowNumber,
 									slot->tts_values, slot->tts_isnull))
 	{
