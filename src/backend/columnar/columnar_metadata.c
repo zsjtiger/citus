@@ -51,6 +51,7 @@
 #include "port.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
+#include "storage/procarray.h"
 #include "storage/smgr.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -707,13 +708,21 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 bool
 StripeWriteFlushed(StripeMetadata *stripeMetadata)
 {
-	/*
-	 * We insert dummy stripe metadata entry when inserting the first row.
-	 * For this reason, rowCount being equal to 0 cannot mean a valid stripe
-	 * with 0 rows but a stripe that is not flushed to disk, probably because
-	 * of an aborted xact.
-	 */
-	return stripeMetadata->rowCount > 0;
+	return !StripeWriteAborted(stripeMetadata) && stripeMetadata->rowCount > 0;
+}
+
+
+bool
+StripeWriteAborted(StripeMetadata *stripeMetadata)
+{
+	return stripeMetadata->aborted;
+}
+
+
+bool
+StripeWriteInProgress(StripeMetadata *stripeMetadata)
+{
+	return !StripeWriteFlushed(stripeMetadata) && !StripeWriteAborted(stripeMetadata);
 }
 
 
@@ -1217,6 +1226,9 @@ BuildStripeMetadata(HeapTuple heapTuple)
 		datumArray[Anum_columnar_stripe_row_count - 1]);
 	stripeMetadata->firstRowNumber = DatumGetUInt64(
 		datumArray[Anum_columnar_stripe_first_row_number - 1]);
+
+	TransactionId entryXmin = HeapTupleHeaderGetXmin(heapTuple->t_data);
+	stripeMetadata->aborted = TransactionIdDidAbort(entryXmin);
 
 	CheckStripeMetadataConsistency(stripeMetadata);
 
