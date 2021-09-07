@@ -25,6 +25,7 @@ extern DestReceiver * CreateRemoteFileDestReceiver(char *resultId, EState *execu
 												   List *initialNodeList, bool
 												   writeLocalFile);
 extern void ReceiveQueryResultViaCopy(const char *resultId);
+extern char * CreateIntermediateResultsDirectory(void);
 extern void RemoveIntermediateResultsDirectory(void);
 extern int64 IntermediateResultSize(char *resultId);
 
