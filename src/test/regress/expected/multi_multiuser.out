@@ -536,7 +536,7 @@ ERROR:  could not receive file "base/pgsql_job_cache/job_0042/task_000001/p_0000
 -- different user should not be able to fetch partition file
 SET ROLE usage_access;
 SELECT worker_fetch_partition_file(42, 1, 1, 1, 'localhost', :worker_1_port);
-WARNING:  could not open file "base/pgsql_job_cache/job_0042/task_000001/p_00001.18007": No such file or directory
+WARNING:  could not open file "base/pgsql_job_cache/job_0042/task_000001/p_00001.37036": No such file or directory
 CONTEXT:  while executing command on localhost:57637
 ERROR:  could not receive file "base/pgsql_job_cache/job_0042/task_000001/p_00001" from localhost:57637
 -- only the user whom created the files should be able to fetch
@@ -548,6 +548,39 @@ SELECT worker_fetch_partition_file(42, 1, 1, 1, 'localhost', :worker_1_port);
 (1 row)
 
 RESET ROLE;
+-- non-superuser should be able to use worker_append_table_to_shard on their own shard
+SET ROLE full_access;
+CREATE TABLE full_access_user_schema.source_table (id int);
+INSERT INTO full_access_user_schema.source_table VALUES (1);
+CREATE TABLE full_access_user_schema.shard_0 (id int);
+SELECT worker_append_table_to_shard('full_access_user_schema.shard_0', 'full_access_user_schema.source_table', 'localhost', :worker_2_port);
+ worker_append_table_to_shard 
+------------------------------
+ 
+(1 row)
+
+SELECT * FROM full_access_user_schema.shard_0;
+ id 
+----
+  1
+(1 row)
+
+RESET ROLE;
+-- other users should not be able to read from a table they have no access to via worker_append_table_to_shard
+SET ROLE usage_access;
+SELECT worker_append_table_to_shard('full_access_user_schema.shard_0', 'full_access_user_schema.source_table', 'localhost', :worker_2_port);
+WARNING:  permission denied for table source_table
+CONTEXT:  while executing command on localhost:57638
+ERROR:  could not copy table "source_table" from "localhost:57638"
+RESET ROLE;
+-- allow usage_access to read from table
+GRANT SELECT ON full_access_user_schema.source_table TO usage_access;
+-- other users should not be able to write to a table they do not have write access to
+SET ROLE usage_access;
+SELECT worker_append_table_to_shard('full_access_user_schema.shard_0', 'full_access_user_schema.source_table', 'localhost', :worker_2_port);
+ERROR:  permission denied for table shard_0
+RESET ROLE;
+DROP TABLE full_access_user_schema.source_table, full_access_user_schema.shard_0;
 -- now we will test that only the user who owns the fetched file is able to merge it into
 -- a table
 -- test that no other user can merge the downloaded file before the task is being tracked
@@ -575,7 +608,7 @@ RESET ROLE;
 -- test that the super user is unable to read the contents of the intermediate file,
 -- although it does create the table
 SELECT worker_merge_files_into_table(42, 1, ARRAY['a'], ARRAY['integer']);
-WARNING:  Task file "task_000001.18003" does not have expected suffix ".10"
+WARNING:  Task file "task_000001.35765" does not have expected suffix ".10"
  worker_merge_files_into_table 
 -------------------------------
  
@@ -617,7 +650,7 @@ SELECT worker_merge_files_and_run_query(42, 1,
     'CREATE TABLE task_000001_merge(merge_column_0 int)',
     'CREATE TABLE task_000001 (a) AS SELECT sum(merge_column_0) FROM task_000001_merge'
 );
-WARNING:  Task file "task_000001.18003" does not have expected suffix ".10"
+WARNING:  Task file "task_000001.35765" does not have expected suffix ".10"
  worker_merge_files_and_run_query 
 ----------------------------------
  
