@@ -4497,6 +4497,11 @@ FindReferencedTableColumn(Expr *columnExpression, List *parentQueryList, Query *
 		query = list_nth(parentQueryList, parentQueryIndex);
 		parentQueryList = list_truncate(parentQueryList, parentQueryIndex);
 	}
+	else if (candidateColumn->varlevelsup > 0)
+	{
+		return;
+	}
+
 
 	if (candidateColumn->varattno == InvalidAttrNumber)
 	{
