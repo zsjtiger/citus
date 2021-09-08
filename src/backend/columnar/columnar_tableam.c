@@ -539,9 +539,16 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		if (stripeMetadata->insertedByCurrentXact)
 		{
 			/*
-			 * Stripe is visible to me, so it must be written by me. Since
-			 * caller might want to use tupleslot datums for some reason, do
-			 * another look-up, but this time by first flushing our writes.
+			 * Stripe write is in progress and its entry is inserted by current
+			 * transaction, so obviously it must be written by me. Since caller
+			 * might want to use tupleslot datums for some reason, do another
+			 * look-up, but this time by first flushing our writes.
+			 *
+			 * XXX: For index scan, this is the only case that we flush pending
+			 * writes of the current backend. If we have taught reader how to
+			 * read from WriteStateMap. then we could guarantee that
+			 * index_fetch_tuple would never flush pending writes, but this seem
+			 * to be too much work for now, but should be doable.
 			 */
 			ColumnarReadFlushPendingWrites(scan->cs_readState);
 
@@ -549,8 +556,8 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 			 * Fill the tupleslot and fall through to return true, it
 			 * certainly exists.
 			 */
-			ColumnarReadRowByRowNumber(scan->cs_readState, rowNumber,
-									   slot->tts_values, slot->tts_isnull);
+			ColumnarReadRowByRowNumberOrError(scan->cs_readState, rowNumber,
+											  slot->tts_values, slot->tts_isnull);
 		}
 		else
 		{
@@ -564,6 +571,12 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 			 * us --possibly to check against constraint violation-- blocks until
 			 * writer transaction commits or aborts, without requiring us to fill
 			 * the tupleslot properly.
+			 *
+			 * XXX: Note that the assumption we made above for the tupleslot
+			 * seems to hold for "unique" and "exclusion" constraint checks when
+			 * indexAM is not lossy. Since we only support "btree" and "hash"
+			 * indexAM's and they are not lossy, we believe this should be enough
+			 * for now, in a hacky way.
 			 */
 			memset(slot->tts_isnull, true, slot->tts_nvalid);
 		}

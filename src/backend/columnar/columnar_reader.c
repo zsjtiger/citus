@@ -342,6 +342,27 @@ ColumnarReadNextRow(ColumnarReadState *readState, Datum *columnValues, bool *col
 
 
 /*
+ * ColumnarReadRowByRowNumberOrError is a wrapper around
+ * ColumnarReadRowByRowNumber that throws an error if tuple
+ * with rowNumber does not exist.
+ */
+void
+ColumnarReadRowByRowNumberOrError(ColumnarReadState *readState,
+								  uint64 rowNumber, Datum *columnValues,
+								  bool *columnNulls)
+{
+	if (!ColumnarReadRowByRowNumber(readState, rowNumber,
+									columnValues, columnNulls))
+	{
+		ereport(ERROR, (errmsg("cannot read from columnar table %s, tuple with "
+							   "row number " UINT64_FORMAT " does not exist",
+							   RelationGetRelationName(readState->relation),
+							   rowNumber)));
+	}
+}
+
+
+/*
  * ColumnarReadRowByRowNumber reads row with rowNumber from given relation
  * into columnValues and columnNulls, and returns true. If no such row
  * exists, then returns false.
