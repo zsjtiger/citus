@@ -127,7 +127,7 @@ static void PopSubXact(SubTransactionId subId);
 static bool MaybeExecutingUDF(void);
 static void ResetGlobalVariables(void);
 static bool SwallowErrors(void (*func)(void));
-static void CloseAllInProgressConnections(void);
+static void ForceAllInProgressConnectionsToClose(void);
 
 
 /*
@@ -335,16 +335,12 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				 * when out of file descriptor.
 				 *
 				 * If an error is swallowed, connections of all active transactions must
-				 * be closed explicitly.
+				 * be forced to close at the end of the transaction explicitly.
 				 */
 				bool errorSwallowed = SwallowErrors(CoordinatedRemoteTransactionsAbort);
 				if (errorSwallowed == true)
 				{
-					/*
-					 * Swallowing errors is the best effort we can make in case of any
-					 * issue happening while closing connections.
-					 */
-					SwallowErrors(CloseAllInProgressConnections);
+					ForceAllInProgressConnectionsToClose();
 				}
 			}
 
@@ -499,10 +495,11 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 
 
 /*
- * CloseAllInProgressConnections closes all connections of in progress transactions.
+ * ForceAllInProgressConnectionsToClose forces all connections of in progress transactions
+ * to close at the end of the transaction.
  */
 static void
-CloseAllInProgressConnections(void)
+ForceAllInProgressConnectionsToClose(void)
 {
 	dlist_iter iter;
 	dlist_foreach(iter, &InProgressTransactions)
@@ -511,7 +508,7 @@ CloseAllInProgressConnections(void)
 													  transactionNode,
 													  iter.cur);
 
-		CloseConnection(connection);
+		connection->forceCloseAtTransactionEnd = true;
 	}
 }
 
@@ -547,12 +544,6 @@ SwallowErrors(void (*func)())
 		MemoryContextSwitchTo(savedContext);
 		ErrorData *edata = CopyErrorData();
 		FlushErrorState();
-
-		/* don't try to intercept PANIC or FATAL, let those breeze past us */
-		if (edata->elevel != ERROR)
-		{
-			PG_RE_THROW();
-		}
 
 		/* rethrow as WARNING */
 		edata->elevel = WARNING;
