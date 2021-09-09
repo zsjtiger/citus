@@ -29,6 +29,7 @@
 #include "distributed/version_compat.h"
 #include "executor/spi.h"
 #include "nodes/makefuncs.h"
+#include "parser/parse_relation.h"
 #include "parser/parse_type.h"
 #include "storage/lmgr.h"
 #include "utils/acl.h"
@@ -77,8 +78,6 @@ worker_merge_files_into_table(PG_FUNCTION_ARGS)
 	bool schemaExists = false;
 	List *columnNameList = NIL;
 	List *columnTypeList = NIL;
-	Oid savedUserId = InvalidOid;
-	int savedSecurityContext = 0;
 	Oid userId = GetUserId();
 
 	/* we should have the same number of column names and types */
@@ -127,14 +126,8 @@ worker_merge_files_into_table(PG_FUNCTION_ARGS)
 
 	CreateTaskTable(jobSchemaName, taskTableName, columnNameList, columnTypeList);
 
-	/* need superuser to copy from files */
-	GetUserIdAndSecContext(&savedUserId, &savedSecurityContext);
-	SetUserIdAndSecContext(CitusExtensionOwner(), SECURITY_LOCAL_USERID_CHANGE);
-
 	CopyTaskFilesFromDirectory(jobSchemaName, taskTableName, taskDirectoryName,
 							   userId);
-
-	SetUserIdAndSecContext(savedUserId, savedSecurityContext);
 
 	PG_RETURN_VOID();
 }
@@ -175,8 +168,6 @@ worker_merge_files_and_run_query(PG_FUNCTION_ARGS)
 	int createMergeTableResult = 0;
 	int createIntermediateTableResult = 0;
 	int finished = 0;
-	Oid savedUserId = InvalidOid;
-	int savedSecurityContext = 0;
 	Oid userId = GetUserId();
 
 	CheckCitusVersion(ERROR);
@@ -224,15 +215,10 @@ worker_merge_files_and_run_query(PG_FUNCTION_ARGS)
 	}
 
 	/* need superuser to copy from files */
-	GetUserIdAndSecContext(&savedUserId, &savedSecurityContext);
-	SetUserIdAndSecContext(CitusExtensionOwner(), SECURITY_LOCAL_USERID_CHANGE);
-
 	appendStringInfo(mergeTableName, "%s%s", intermediateTableName->data,
 					 MERGE_TABLE_SUFFIX);
 	CopyTaskFilesFromDirectory(jobSchemaName, mergeTableName, taskDirectoryName,
 							   userId);
-
-	SetUserIdAndSecContext(savedUserId, savedSecurityContext);
 
 	createIntermediateTableResult = SPI_exec(createIntermediateTableQuery, 0);
 	if (createIntermediateTableResult < 0)
@@ -538,9 +524,8 @@ CopyTaskFilesFromDirectory(StringInfo schemaName, StringInfo relationName,
 	for (; directoryEntry != NULL; directoryEntry = ReadDir(directory, directoryName))
 	{
 		const char *baseFilename = directoryEntry->d_name;
-		const char *queryString = NULL;
 		StringInfo fullFilename = NULL;
-		RangeVar *relation = NULL;
+		RangeVar *rangeVar = NULL;
 		CopyStmt *copyStatement = NULL;
 		uint64 copiedRowCount = 0;
 
@@ -568,8 +553,8 @@ CopyTaskFilesFromDirectory(StringInfo schemaName, StringInfo relationName,
 		appendStringInfo(fullFilename, "%s/%s", directoryName, baseFilename);
 
 		/* build relation object and copy statement */
-		relation = makeRangeVar(schemaName->data, relationName->data, -1);
-		copyStatement = CopyStatement(relation, fullFilename->data);
+		rangeVar = makeRangeVar(schemaName->data, relationName->data, -1);
+		copyStatement = CopyStatement(rangeVar, fullFilename->data);
 		if (BinaryWorkerCopyFormat)
 		{
 			DefElem *copyOption = makeDefElem("format", (Node *) makeString("binary"),
@@ -578,12 +563,25 @@ CopyTaskFilesFromDirectory(StringInfo schemaName, StringInfo relationName,
 		}
 
 		{
-			ParseState *pstate = make_parsestate(NULL);
-			pstate->p_sourcetext = queryString;
+			CopyState copyState = NULL;
+			ParseState *parseState = make_parsestate(NULL);
 
-			DoCopy(pstate, copyStatement, -1, -1, &copiedRowCount);
+			Relation relation = heap_openrv(rangeVar, RowExclusiveLock);
+			(void) addRangeTableEntryForRelation(parseState, relation,
+												 NULL, false, false);
 
-			free_parsestate(pstate);
+			copyState = BeginCopyFrom(parseState,
+									  relation,
+									  copyStatement->filename,
+									  copyStatement->is_program,
+									  NULL,
+									  copyStatement->attlist,
+									  copyStatement->options);
+			copiedRowCount = CopyFrom(copyState);
+			EndCopyFrom(copyState);
+
+			free_parsestate(parseState);
+			heap_close(relation, NoLock);
 		}
 
 		copiedRowTotal += copiedRowCount;
