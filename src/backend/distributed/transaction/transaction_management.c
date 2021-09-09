@@ -504,6 +504,7 @@ ForceAllInProgressConnectionsToClose(void)
 	dlist_iter iter;
 	dlist_foreach(iter, &InProgressTransactions)
 	{
+		elog(INFO, "force close");
 		MultiConnection *connection = dlist_container(MultiConnection,
 													  transactionNode,
 													  iter.cur);
