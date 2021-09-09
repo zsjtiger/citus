@@ -337,6 +337,10 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				bool errorSwallowed = SwallowErrors(CoordinatedRemoteTransactionsAbort);
 				if (errorSwallowed == true)
 				{
+					/*
+					 * Swallowing errors is the best we effort we can make in case of any
+					 * issue happening while closing connections.
+					 */
 					SwallowErrors(CloseAllInProgressConnections);
 				}
 			}
