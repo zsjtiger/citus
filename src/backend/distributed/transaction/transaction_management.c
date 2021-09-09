@@ -331,6 +331,9 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				 * Since CoordinateRemoteTransactionsAbort may cause an error and it is
 				 * not allowed to error out at that point, swallow the error if any.
 				 *
+				 * Particular error we've observed was CreateWaitEventSet throwing an error
+				 * when out of file descriptor.
+				 *
 				 * If an error is swallowed, connections of all active transactions must
 				 * be closed explicitly.
 				 */
@@ -338,7 +341,7 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				if (errorSwallowed == true)
 				{
 					/*
-					 * Swallowing errors is the best we effort we can make in case of any
+					 * Swallowing errors is the best effort we can make in case of any
 					 * issue happening while closing connections.
 					 */
 					SwallowErrors(CloseAllInProgressConnections);
