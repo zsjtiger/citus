@@ -272,5 +272,35 @@ REINDEX TABLE dist_part_table;
 -- but we support REINDEXing partitions
 REINDEX TABLE dist_part_table_1;
 
+--
+-- https://github.com/citusdata/citus/issues/5258
+--
+CREATE TABLE nummultirange_test (nmr NUMMULTIRANGE) USING columnar;
+INSERT INTO nummultirange_test VALUES('{}');
+INSERT INTO nummultirange_test VALUES('{[,)}');
+INSERT INTO nummultirange_test VALUES('{[3,]}');
+INSERT INTO nummultirange_test VALUES('{[, 5)}');
+INSERT INTO nummultirange_test VALUES(nummultirange());
+INSERT INTO nummultirange_test VALUES(nummultirange(variadic '{}'::numrange[]));
+INSERT INTO nummultirange_test VALUES(nummultirange(numrange(1.1, 2.2)));
+INSERT INTO nummultirange_test VALUES('{empty}');
+INSERT INTO nummultirange_test VALUES(nummultirange(numrange(1.7, 1.7, '[]'), numrange(1.7, 1.9)));
+INSERT INTO nummultirange_test VALUES(nummultirange(numrange(1.7, 1.7, '[]'), numrange(1.9, 2.1)));
+
+create table nummultirange_test2(nmr nummultirange) USING columnar;
+INSERT INTO nummultirange_test2 VALUES('{[, 5)}');
+INSERT INTO nummultirange_test2 VALUES(nummultirange(numrange(1.1, 2.2)));
+INSERT INTO nummultirange_test2 VALUES(nummultirange(numrange(1.1, 2.2)));
+INSERT INTO nummultirange_test2 VALUES(nummultirange(numrange(1.1, 2.2,'()')));
+INSERT INTO nummultirange_test2 VALUES('{}');
+select * from nummultirange_test2 where nmr = '{}';
+select * from nummultirange_test2 where nmr = nummultirange(numrange(1.1, 2.2));
+select * from nummultirange_test2 where nmr = nummultirange(numrange(1.1, 2.3));
+
+set enable_nestloop=t;
+set enable_hashjoin=f;
+set enable_mergejoin=f;
+select * from nummultirange_test natural join nummultirange_test2 order by nmr;
+
 set client_min_messages to error;
 drop schema pg14 cascade;
