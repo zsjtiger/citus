@@ -97,6 +97,7 @@ SELECT run_command_on_workers($$SELECT count(*) FROM information_schema.tables W
 -- Kill and cancel the connection after worker sends "PREPARE TRANSACTION" ack with colocate_with option
 SELECT citus.mitmproxy('conn.onCommandComplete(command="PREPARE TRANSACTION").after(1).kill()');
 SELECT citus.mitmproxy('conn.onCommandComplete(command="ROLLBACK PREPARED").kill()');
+SET citus.force_max_query_parallelization TO ON;
 SELECT create_distributed_table('test_table','id',colocate_with=>'temp_table');
 
 SELECT citus.mitmproxy('conn.allow()');
