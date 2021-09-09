@@ -316,3 +316,22 @@ select filtered_row_count('execute foo(3)');
 select filtered_row_count('execute foo(3)');
 select filtered_row_count('execute foo(3)');
 drop table columnar_prepared_stmt;
+
+--
+-- https://github.com/citusdata/citus/issues/5258
+--
+set default_table_access_method to columnar;
+CREATE TABLE atest1 ( a int, b text );
+CREATE TABLE atest2 (col1 varchar(10), col2 boolean);
+
+INSERT INTO atest1 VALUES (1, 'one');
+SELECT * FROM atest1; -- ok
+SELECT * FROM atest2; -- ok
+INSERT INTO atest1 VALUES (2, 'two'); -- ok
+INSERT INTO atest1 SELECT 1, b FROM atest1; -- ok
+
+SELECT * FROM atest2 WHERE ( col1 IN ( SELECT b FROM atest1 ) );
+
+DROP TABLE atest1;
+DROP TABLE atest2;
+set default_table_access_method to default;
