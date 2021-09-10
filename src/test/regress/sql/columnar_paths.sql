@@ -33,7 +33,7 @@ SELECT a FROM full_correlated WHERE a>1000000;
 $$
 );
 
-SELECT columnar_test_helpers.uses_index_scan (
+SELECT columnar_test_helpers.uses_custom_scan (
 $$
 SELECT a FROM full_correlated WHERE a>900000;
 $$
@@ -41,7 +41,7 @@ $$
 
 BEGIN;
   SET LOCAL columnar.enable_custom_scan TO 'OFF';
-  SELECT columnar_test_helpers.uses_index_scan (
+  SELECT columnar_test_helpers.uses_seq_scan (
   $$
   SELECT a FROM full_correlated WHERE a>900000;
   $$
@@ -60,7 +60,7 @@ SELECT a,b FROM full_correlated WHERE a<3000;
 $$
 );
 
-SELECT columnar_test_helpers.uses_index_scan (
+SELECT columnar_test_helpers.uses_custom_scan (
 $$
 SELECT a FROM full_correlated WHERE a<9000;
 $$
@@ -112,7 +112,9 @@ BEGIN;
   );
 ROLLBACK;
 
-SELECT columnar_test_helpers.uses_index_scan (
+-- again same filter used in above, but we would choose custom scan this
+-- time since it would read three less columns from disk
+SELECT columnar_test_helpers.uses_custom_scan (
 $$
 SELECT c FROM full_correlated WHERE a<10000;
 $$
@@ -291,7 +293,7 @@ SELECT a FROM full_anti_correlated WHERE a>2000 AND a<7000;
 $$
 );
 
-SELECT columnar_test_helpers.uses_index_scan (
+SELECT columnar_test_helpers.uses_custom_scan (
 $$
 SELECT a FROM full_anti_correlated WHERE a<7000 AND b<'10000';
 $$
@@ -299,7 +301,7 @@ $$
 
 BEGIN;
   SET LOCAL columnar.enable_custom_scan TO 'OFF';
-  SELECT columnar_test_helpers.uses_index_scan (
+  SELECT columnar_test_helpers.uses_seq_scan (
   $$
   SELECT a FROM full_anti_correlated WHERE a<7000 AND b<'10000';
   $$
@@ -352,6 +354,7 @@ CREATE INDEX correlated_idx ON correlated(x);
 CREATE INDEX uncorrelated_idx ON uncorrelated(x);
 ANALYZE correlated, uncorrelated;
 
+-- should choose chunk group filtering; selective and correlated
 EXPLAIN (analyze on, costs off, timing off, summary off)
 SELECT * FROM correlated WHERE x = 78910;
 SELECT * FROM correlated WHERE x = 78910;

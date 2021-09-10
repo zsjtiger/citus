@@ -155,20 +155,18 @@ BEGIN;
   -- partitions since index scan is more expensive than seq scan too
   EXPLAIN (costs off) SELECT count(*), sum(i), min(i), max(i) FROM parent
   WHERE ts > '2020-02-20' AND n < 5;
-                                      QUERY PLAN
+                                                   QUERY PLAN
 ---------------------------------------------------------------------
  Aggregate
    ->  Append
-         ->  Index Scan using p1_n_idx on p1 parent_1
-               Index Cond: (n < '5'::numeric)
-               Filter: (ts > 'Thu Feb 20 00:00:00 2020 PST'::timestamp with time zone)
+         ->  Seq Scan on p1 parent_1
+               Filter: ((ts > 'Thu Feb 20 00:00:00 2020 PST'::timestamp with time zone) AND (n < '5'::numeric))
          ->  Index Scan using p2_n_idx on p2 parent_2
                Index Cond: (n < '5'::numeric)
                Filter: (ts > 'Thu Feb 20 00:00:00 2020 PST'::timestamp with time zone)
-         ->  Index Scan using p3_n_idx on p3 parent_3
-               Index Cond: (n < '5'::numeric)
-               Filter: (ts > 'Thu Feb 20 00:00:00 2020 PST'::timestamp with time zone)
-(11 rows)
+         ->  Seq Scan on p3 parent_3
+               Filter: ((ts > 'Thu Feb 20 00:00:00 2020 PST'::timestamp with time zone) AND (n < '5'::numeric))
+(9 rows)
 
 ROLLBACK;
 DROP TABLE parent;
