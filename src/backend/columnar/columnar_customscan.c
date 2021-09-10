@@ -81,7 +81,7 @@ static void AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel,
 static void RemovePathsByPredicate(RelOptInfo *rel, PathPredicate removePathPredicate);
 static bool IsNotIndexPath(Path *path);
 static Cost ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
-											Oid relationId, IndexPath *indexPath);
+									   Oid relationId, IndexPath *indexPath);
 static int RelationIdGetNumberOfAttributes(Oid relationId);
 static Cost ColumnarPerStripeScanCost(RelOptInfo *rel, Oid relationId,
 									  int numberOfColumnsRead);
@@ -447,18 +447,19 @@ CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 		return;
 	}
 
-	ereport(ColumnarPlannerDebugLevel, (errmsg("columnar table index scan costs estimated by "
-							"indexAM: startup cost = %.4f, total cost = "
-							"%.4f", indexPath->path.startup_cost,
-							indexPath->path.total_cost)));
+	ereport(ColumnarPlannerDebugLevel,
+			(errmsg("columnar table index scan costs estimated by indexAM: "
+					"startup cost = %.4f, total cost = %.4f",
+					indexPath->path.startup_cost, indexPath->path.total_cost)));
 
 	indexPath->path.startup_cost = 0;
-	indexPath->path.total_cost = ColumnarIndexScanTotalCost(root, rel, relationId, indexPath);
+	indexPath->path.total_cost = ColumnarIndexScanTotalCost(root, rel, relationId,
+															indexPath);
 
-	ereport(ColumnarPlannerDebugLevel, (errmsg("columnar table index scan costs estimated "
-							"by columnarAM: startup cost = %.4f, total "
-							"cost = %.4f", indexPath->path.startup_cost,
-							indexPath->path.total_cost)));
+	ereport(ColumnarPlannerDebugLevel,
+			(errmsg("columnar table index scan costs estimated by columnarAM: "
+					"startup cost = %.4f, total cost = %.4f",
+					indexPath->path.startup_cost, indexPath->path.total_cost)));
 }
 
 
@@ -468,7 +469,7 @@ CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
  */
 static Cost
 ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
-								Oid relationId, IndexPath *indexPath)
+						   Oid relationId, IndexPath *indexPath)
 {
 	int numberOfColumnsRead = RelationIdGetNumberOfAttributes(relationId);
 	Cost perStripeCost = ColumnarPerStripeScanCost(rel, relationId, numberOfColumnsRead);
@@ -538,14 +539,12 @@ ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
 
 	Cost scanCost = perStripeCost * estimatedStripeReadCount;
 
-	ereport(ColumnarPlannerDebugLevel, (errmsg("costing index scan for columnar table: "
-							"selectivity = %.4f, complement abs "
-							"correlation = %.4f, per stripe cost = %.4f, "
-							"estimated stripe read count = %.4f, "
-							"total cost = %.4f",
-							indexSelectivity, complementIndexCorrelation,
-							perStripeCost, estimatedStripeReadCount,
-							scanCost)));
+	ereport(ColumnarPlannerDebugLevel,
+			(errmsg("costing index scan for columnar table: selectivity = %.4f, "
+					"complement abs correlation = %.4f, per stripe cost = %.4f, "
+					"estimated stripe read count = %.4f, total cost = %.4f",
+					indexSelectivity, complementIndexCorrelation, perStripeCost,
+					estimatedStripeReadCount, scanCost)));
 
 	return scanCost;
 }
