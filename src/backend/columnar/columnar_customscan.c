@@ -455,7 +455,7 @@ CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 	indexPath->path.startup_cost = 0;
 	indexPath->path.total_cost = ColumnarIndexScanTotalCost(root, rel, relationId, indexPath);
 
-	ereport(DEBUG4, (errmsg("columnar table index scan costs re-estimated "
+	ereport(DEBUG4, (errmsg("columnar table index scan costs estimated "
 							"by columnarAM: startup cost = %.10f, total "
 							"cost = %.10f", indexPath->path.startup_cost,
 							indexPath->path.total_cost)));
