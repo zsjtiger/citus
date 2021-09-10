@@ -538,11 +538,11 @@ ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
 
 	Cost scanCost = perStripeCost * estimatedStripeReadCount;
 
-	ereport(DEBUG4, (errmsg("re-costing index scan for columnar table: "
+	ereport(DEBUG4, (errmsg("costing index scan for columnar table: "
 							"selectivity = %.10f, complement abs "
 							"correlation = %.10f, per stripe cost = %.10f, "
 							"estimated stripe read count = %.10f, "
-							"total additional cost = %.10f",
+							"total cost = %.10f",
 							indexSelectivity, complementIndexCorrelation,
 							perStripeCost, estimatedStripeReadCount,
 							scanCost)));
