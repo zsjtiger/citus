@@ -80,7 +80,7 @@ static void AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel,
 /* helper functions to be used when costing paths or altering them */
 static void RemovePathsByPredicate(RelOptInfo *rel, PathPredicate removePathPredicate);
 static bool IsNotIndexPath(Path *path);
-static Cost ColumnarIndexScanAdditionalCost(PlannerInfo *root, RelOptInfo *rel,
+static Cost ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
 											Oid relationId, IndexPath *indexPath);
 static int RelationIdGetNumberOfAttributes(Oid relationId);
 static Cost ColumnarPerStripeScanCost(RelOptInfo *rel, Oid relationId,
@@ -452,29 +452,22 @@ CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 							"%.10f", indexPath->path.startup_cost,
 							indexPath->path.total_cost)));
 
-	/*
-	 * We estimate the cost for columnar table read during index scan. Also,
-	 * instead of overwriting total cost, we "add" ours to the cost estimated
-	 * by indexAM since we should consider index traversal related costs too.
-	 */
-	Cost columnarIndexScanCost = ColumnarIndexScanAdditionalCost(root, rel, relationId,
-																 indexPath);
-	indexPath->path.total_cost += columnarIndexScanCost;
+	indexPath->path.startup_cost = 0;
+	indexPath->path.total_cost = ColumnarIndexScanTotalCost(root, rel, relationId, indexPath);
 
 	ereport(DEBUG4, (errmsg("columnar table index scan costs re-estimated "
-							"by columnarAM (including indexAM costs): "
-							"startup cost = %.10f, total cost = %.10f",
-							indexPath->path.startup_cost,
+							"by columnarAM: startup cost = %.10f, total "
+							"cost = %.10f", indexPath->path.startup_cost,
 							indexPath->path.total_cost)));
 }
 
 
 /*
- * ColumnarIndexScanAdditionalCost returns additional cost estimated for
+ * ColumnarIndexScanTotalCost returns additional cost estimated for
  * index scan described by IndexPath for columnar table with relationId.
  */
 static Cost
-ColumnarIndexScanAdditionalCost(PlannerInfo *root, RelOptInfo *rel,
+ColumnarIndexScanTotalCost(PlannerInfo *root, RelOptInfo *rel,
 								Oid relationId, IndexPath *indexPath)
 {
 	int numberOfColumnsRead = RelationIdGetNumberOfAttributes(relationId);
